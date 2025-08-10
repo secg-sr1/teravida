@@ -1,4 +1,3 @@
-// /api/_proxy.js  (CommonJS)
 const API_BASE = process.env.UPSTREAM_BASE || 'https://apicellswhyfor.com/items';
 const AUTH = process.env.UPSTREAM_TOKEN;
 
@@ -25,16 +24,11 @@ async function postTo(endpoint, req, res) {
     else console.warn('UPSTREAM_TOKEN not set — upstream likely to return 403');
 
     const url = `${API_BASE}/${endpoint}`;
-    const upstream = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-    });
+    const upstream = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
 
     const text = await upstream.text();
-    console.log(`${endpoint} → ${upstream.status} ${upstream.statusText} body[0..200]=`, text.slice(0, 200));
+    console.log(`${endpoint} → ${upstream.status} ${upstream.statusText} ::`, text.slice(0, 200));
 
-    // Always pass upstream status/body through so you can see errors
     res.status(upstream.status).setHeader('Content-Type', 'application/json').send(text);
   } catch (err) {
     console.error(`${endpoint} function error:`, err.stack || String(err));

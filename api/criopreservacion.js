@@ -54,11 +54,11 @@
 // }
 
 
-// /api/criopreservacion.js
 const { postTo, handleCors } = require('./_proxy');
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return handleCors(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
   return postTo('criopreservacion', req, res);
 };
+
 
