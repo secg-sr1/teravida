@@ -5,8 +5,15 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const TO = process.env.CONTACT_TO || 'contacto@stem-care.com'; // recipient
 
 export default async function handler(req, res) {
+
+  if (!nombre?.trim() || !email?.trim()) {
+  return res.status(400).json({ ok:false, error:'Nombre y email son requeridos.' });
+}
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST')   return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+
+  
+
 
   try {
     // Accept your form fields (adjust names if needed)

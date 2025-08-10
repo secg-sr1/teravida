@@ -90,27 +90,6 @@ export default function App() {
 
   const handleChange = (field) => (e) => setFormData({ ...formData, [field]: e.target.value })
 
-  // const handleSubmit = async () => {
-  //   let endpoint = ''
-  //   let payload = {}
-  //   if (activeTab === 0) {
-  //     endpoint = '/api/criopreservacion'
-  //     payload = { ...formData }
-  //   } else if (activeTab === 1) {
-  //     endpoint = '/api/terapia_celular'
-  //     payload = { nombre: formData.nombre, apellidos: formData.apellidos, email: formData.email, telefono: formData.telefono, telefonos_de_contacto: formData.telefonos_de_contacto, mensaje: formData.mensaje }
-  //   } else if (activeTab === 2) {
-  //     endpoint = '/api/pruebas_geneticas'
-  //     payload = { nombre: formData.nombre, apellidos: formData.apellidos, email: formData.email, telefono: formData.telefono, telefonos_de_contacto: formData.telefonos_de_contacto, mensaje: formData.mensaje }
-  //   }
-  //   try {
-  //     const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-  //     if (!res.ok) throw new Error()
-  //     alert('Formulario enviado con éxito')
-  //     setOpenDialog(false)
-  //   } catch { alert('Error al enviar el formulario') }
-  // }
-
   async function sendContact(formData, origen) {
   const res = await fetch('/api/contact', {
     method: 'POST',
@@ -124,11 +103,29 @@ export default function App() {
 }
 
 
-const handleSubmit = async () => {
+// const handleSubmit = async () => {
+//   const origen =
+//     activeTab === 0 ? 'Criopreservación' :
+//     activeTab === 1 ? 'Terapia Celular' :
+//     'Pruebas Genéticas';
+
+//   try {
+//     await sendContact(formData, origen);
+//     alert('Formulario enviado con éxito');
+//     setOpenDialog(false);
+//   } catch (err) {
+//     console.error(err);
+//     alert('Error al enviar el formulario');
+//   }
+// };
+
+  const handleSubmit = async () => {
   const origen =
     activeTab === 0 ? 'Criopreservación' :
-    activeTab === 1 ? 'Terapia Celular' :
-    'Pruebas Genéticas';
+    activeTab === 1 ? 'Terapia Celular' : 'Pruebas Genéticas';
+
+  if (!formData.nombre?.trim()) { alert('Falta el nombre'); return; }
+  if (!formData.email?.trim())  { alert('Falta el e-mail'); return; }
 
   try {
     await sendContact(formData, origen);
@@ -139,62 +136,6 @@ const handleSubmit = async () => {
     alert('Error al enviar el formulario');
   }
 };
-
-
-
-//   const handleSubmit = async () => {
-//   let endpoint = '';
-//   let payload = {};
-
-  
-
-//   if (activeTab === 0) {
-//     endpoint = '/api/criopreservacion';
-//     payload = { ...formData };
-//   } else if (activeTab === 1) {
-//     endpoint = '/api/terapia_celular';
-//     payload = {
-//       nombre: formData.nombre,
-//       apellidos: formData.apellidos,
-//       email: formData.email,
-//       telefono: formData.telefono,
-//       telefonos_de_contacto: formData.telefonos_de_contacto,
-//       mensaje: formData.mensaje ?? ''
-//     };
-//   } else if (activeTab === 2) {
-//     endpoint = '/api/pruebas_geneticas';
-//     payload = {
-//       nombre: formData.nombre,
-//       apellidos: formData.apellidos,
-//       email: formData.email,
-//       telefono: formData.telefono,
-//       telefonos_de_contacto: formData.telefonos_de_contacto,
-//       mensaje: formData.mensaje ?? ''
-//     };
-//   }
-
-//   try {
-//     const res = await fetch(endpoint, {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify(payload)
-//     });
-
-//     const text = await res.text(); // <-- see exact error from API/function
-//     if (!res.ok) {
-//       console.error(`Submit failed ${res.status}:`, text);
-//       alert(`Error al enviar el formulario (${res.status}). Revisa la consola.`);
-//       return;
-//     }
-
-//     console.log('Submit OK:', text);
-//     alert('Formulario enviado con éxito');
-//     setOpenDialog(false);
-//   } catch (err) {
-//     console.error('Submit crash:', err);
-//     alert('Error al enviar el formulario (network/client).');
-//   }
-// };
 
 
 
@@ -297,33 +238,6 @@ const handleSubmit = async () => {
         }}
       />
 
-
-      {/* <footer style={{
-        position: 'absolute',
-        bottom: 0,
-        width: '100%',
-        textAlign: 'center',
-        fontSize: 10,
-        padding: '10px 0',
-        color: '#999',
-        fontFamily: 'Manrope, sans-serif',
-        zIndex:1
-      }}>
-        © {new Date().getFullYear()} Supervisado por el Departamento de Investigación de Stem Care. |  Comprueba la información importante ó contáctanos. 
-      </footer> */}
-      {/* <footer style={{
-        position: 'fixed',
-        bottom: 0,
-        width: '100%',
-        textAlign: 'center',
-        fontSize: isMobile ? 9 : 10,
-        padding: isMobile ? '6px 0' : '10px 0',
-        color: '#999',
-        fontFamily: 'Manrope, sans-serif',
-        zIndex: 1
-      }}>
-        © {new Date().getFullYear()} Supervisado por el Departamento de Investigación de Stem Care. |  Comprueba la información importante ó contáctanos.
-      </footer> */}
       <footer style={{
           position: 'fixed',
           bottom: 0,
@@ -336,7 +250,7 @@ const handleSubmit = async () => {
           height: footerHeight,
           zIndex:1
         }}>
-          © 2025 Supervisado por el Departamento de Investigación de Stem Care. |  Comprueba la información importante ó contáctanos.
+          © 2025 Supervisado por el Departamento de Investigacion & Desarrollo en Stem Care. |  Comprueba la información importante ó contáctanos.
 </footer>
 
 
@@ -362,53 +276,6 @@ const handleSubmit = async () => {
         </EffectComposer>
       </Canvas>
 
-      {/* <Box
-        ref={scrollRef}
-        sx={{
-          position: 'absolute',
-          bottom: 130,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          px: 2,
-          maxHeight: '50vh',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          width: '100%',
-          maxWidth: '720px',
-          backdropFilter: 'blur(12px)',
-          backgroundColor: 'rgba(255, 255, 255, 0.3)',
-          borderRadius: 2,
-          padding: 2,
-          '&::-webkit-scrollbar': {
-            width: '5px',
-          },
-          '&::-webkit-scrollbar-track': {
-            backgroundColor: '#c6c6c6ff',
-          },
-          '&::-webkit-scrollbar-thumb': {
-            backgroundColor: '#959595ff',
-            borderRadius: '5px',
-          }
-        }}
-      >
-        {messages.map((m, i) => (
-          <Typography
-            key={i}
-            variant="body2"
-            sx={{
-              mb: 1,
-              color: m.role === 'user' ? '#000' : '#565457ff',
-              fontFamily: 'Manrope',
-              fontWeight: m.role === 'user' ? 700 : 300,
-              textAlign: 'left',
-              whiteSpace: 'pre-line'
-            }}
-          >
-            {m.content}
-          </Typography>
-        ))}
-      </Box> */}
       <Collapse in={hasConversation} timeout={300} unmountOnExit>
         <Box
           ref={scrollRef}
@@ -449,36 +316,6 @@ const handleSubmit = async () => {
         </Box>
       </Collapse>
 
-
-      {/* <Box
-        sx={{
-          position: 'absolute',
-          bottom: 80,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          gap: 1,
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          maxWidth: 720,
-          px: 2
-        }}
-      >
-        {[
-        'Beneficios de células madre',
-        'Terapia Celular',
-        'Pruebas Genéticas',
-        ].map((question, index) => (
-          <Chip
-            key={index}
-            label={question}
-            variant="outlined"
-            onClick={() => handleChipClick(question)}
-            sx={{ fontFamily: 'Manrope' }}
-          />
-        ))}
-      </Box> */}
-
       <Box
          sx={{
             position: 'fixed',
@@ -506,65 +343,11 @@ const handleSubmit = async () => {
       </Box>
 
 
-      {/* <Box
-        className="prompt-box"
-        sx={{
-          position: 'absolute',
-          bottom: 28,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          bgcolor: '#f0f0f0ff',
-          borderRadius: '20px',
-          mx: 'auto',
-          maxWidth: 600,
-          px: 2,
-          py: 1
-        }}
-      >
-        <TextField
-          fullWidth
-          size={isMobile ? 'small' : 'medium'}
-          variant="standard"
-          placeholder="Pregunta sobre células madre"
-          InputProps={{
-            disableUnderline: true,
-            sx: { ml: 1, color: '#202020', fontFamily: 'Manrope', fontSize:14 },
-            value: input,
-            onChange: (e) => setInput(e.target.value),
-            onKeyDown: (e) => e.key === 'Enter' && sendMessage(),
-            endAdornment: (
-              <InputAdornment position="end">
-                <Tooltip title="Haz click para agendar tu consulta">
-                  <IconButton onClick={() => setOpenDialog(true)}>
-                    <AccountCircleIcon sx={{ color: '#535353ff' }} />
-                  </IconButton>
-                </Tooltip>
-              </InputAdornment>
-            )
-          }}
-        />
-      </Box> */}
+
 
       <Box
         className="prompt-box"
         sx={{
-          // position: 'fixed',
-          // bottom: promptBottom,
-          // left: '50%',
-          // transform: 'translateX(-50%)',
-          // display: 'flex',
-          // justifyContent: 'center',
-          // alignItems: 'center',
-          // bgcolor: '#f0f0f0ff',
-          // borderRadius: '20px',
-          // mx: 'auto',
-          // maxWidth: promptMaxWidth,
-          // width: '100%',
-          // px: 2,
-          // py: isMobile ? 0.75 : 1
               position: 'fixed',
               bottom: promptBottom,
               left: '50%',
@@ -604,21 +387,6 @@ const handleSubmit = async () => {
         />
       </Box>
 
-
-      {/* <Dialog open={openDialog} onClose={() => setOpenDialog(false)}
-        PaperProps={{
-          sx: {
-            backdropFilter: 'blur(12px)',
-            backgroundColor: 'rgba(255, 255, 255, 0.82)',
-            borderRadius: 3,
-            px: 2,
-            py: 1,
-            fontFamily: 'Manrope',
-            
-          }
-        }}
-      > */}
-
         <Dialog
           open={openDialog}
           onClose={() => setOpenDialog(false)}
@@ -639,13 +407,6 @@ const handleSubmit = async () => {
 
       
         <DialogTitle sx={{fontFamily: 'Manrope'}}>Agendar Consulta</DialogTitle>
-
-        {/* <Tabs
-          value={activeTab}
-          onChange={(e, newValue) => setActiveTab(newValue)}
-          variant="fullWidth"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
-        > */}
         <Tabs
           value={activeTab}
           onChange={(e, v) => setActiveTab(v)}
