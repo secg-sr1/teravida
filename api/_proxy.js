@@ -1,3 +1,4 @@
+// /api/_proxy.js  (CommonJS)
 const API_BASE = process.env.UPSTREAM_BASE || 'https://apicellswhyfor.com/items';
 const AUTH = process.env.UPSTREAM_TOKEN;
 
@@ -7,7 +8,8 @@ async function readJson(req) {
     let data = '';
     req.on('data', c => (data += c));
     req.on('end', () => {
-      try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(e); }
+      try { resolve(data ? JSON.parse(data) : {}); }
+      catch (e) { reject(new Error('Invalid JSON body: ' + e.message)); }
     });
     req.on('error', reject);
   });
@@ -16,25 +18,27 @@ async function readJson(req) {
 async function postTo(endpoint, req, res) {
   try {
     const bodyObj = await readJson(req);
-    const payload = { data: bodyObj }; // Directus expects { data: {...} }
+    const payload = { data: bodyObj }; // Directus shape
 
     const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
     if (AUTH) headers.Authorization = `Bearer ${AUTH}`;
-    else console.warn('UPSTREAM_TOKEN not set — upstream may return 403');
+    else console.warn('UPSTREAM_TOKEN not set — upstream likely to return 403');
 
-    const upstream = await fetch(`${API_BASE}/${endpoint}`, {
+    const url = `${API_BASE}/${endpoint}`;
+    const upstream = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
     });
 
     const text = await upstream.text();
-    console.log(`${endpoint} → ${upstream.status} ${upstream.statusText} :: ${text.slice(0, 180)}`);
+    console.log(`${endpoint} → ${upstream.status} ${upstream.statusText} body[0..200]=`, text.slice(0, 200));
 
+    // Always pass upstream status/body through so you can see errors
     res.status(upstream.status).setHeader('Content-Type', 'application/json').send(text);
   } catch (err) {
-    console.error(`${endpoint} proxy error:`, err);
-    res.status(500).json({ error: 'Function crashed', detail: String(err) });
+    console.error(`${endpoint} function error:`, err.stack || String(err));
+    res.status(500).json({ error: 'Function crashed', detail: err?.message || String(err) });
   }
 }
 

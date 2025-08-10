@@ -56,26 +56,79 @@ export default function App() {
 
   const handleChange = (field) => (e) => setFormData({ ...formData, [field]: e.target.value })
 
+  // const handleSubmit = async () => {
+  //   let endpoint = ''
+  //   let payload = {}
+  //   if (activeTab === 0) {
+  //     endpoint = '/api/criopreservacion'
+  //     payload = { ...formData }
+  //   } else if (activeTab === 1) {
+  //     endpoint = '/api/terapia_celular'
+  //     payload = { nombre: formData.nombre, apellidos: formData.apellidos, email: formData.email, telefono: formData.telefono, telefonos_de_contacto: formData.telefonos_de_contacto, mensaje: formData.mensaje }
+  //   } else if (activeTab === 2) {
+  //     endpoint = '/api/pruebas_geneticas'
+  //     payload = { nombre: formData.nombre, apellidos: formData.apellidos, email: formData.email, telefono: formData.telefono, telefonos_de_contacto: formData.telefonos_de_contacto, mensaje: formData.mensaje }
+  //   }
+  //   try {
+  //     const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+  //     if (!res.ok) throw new Error()
+  //     alert('Formulario enviado con éxito')
+  //     setOpenDialog(false)
+  //   } catch { alert('Error al enviar el formulario') }
+  // }
+
   const handleSubmit = async () => {
-    let endpoint = ''
-    let payload = {}
-    if (activeTab === 0) {
-      endpoint = '/api/criopreservacion'
-      payload = { ...formData }
-    } else if (activeTab === 1) {
-      endpoint = '/api/terapia_celular'
-      payload = { nombre: formData.nombre, apellidos: formData.apellidos, email: formData.email, telefono: formData.telefono, telefonos_de_contacto: formData.telefonos_de_contacto, mensaje: formData.mensaje }
-    } else if (activeTab === 2) {
-      endpoint = '/api/pruebas_geneticas'
-      payload = { nombre: formData.nombre, apellidos: formData.apellidos, email: formData.email, telefono: formData.telefono, telefonos_de_contacto: formData.telefonos_de_contacto, mensaje: formData.mensaje }
-    }
-    try {
-      const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-      if (!res.ok) throw new Error()
-      alert('Formulario enviado con éxito')
-      setOpenDialog(false)
-    } catch { alert('Error al enviar el formulario') }
+  let endpoint = '';
+  let payload = {};
+
+  if (activeTab === 0) {
+    endpoint = '/api/criopreservacion';
+    payload = { ...formData };
+  } else if (activeTab === 1) {
+    endpoint = '/api/terapia_celular';
+    payload = {
+      nombre: formData.nombre,
+      apellidos: formData.apellidos,
+      email: formData.email,
+      telefono: formData.telefono,
+      telefonos_de_contacto: formData.telefonos_de_contacto,
+      mensaje: formData.mensaje ?? ''
+    };
+  } else if (activeTab === 2) {
+    endpoint = '/api/pruebas_geneticas';
+    payload = {
+      nombre: formData.nombre,
+      apellidos: formData.apellidos,
+      email: formData.email,
+      telefono: formData.telefono,
+      telefonos_de_contacto: formData.telefonos_de_contacto,
+      mensaje: formData.mensaje ?? ''
+    };
   }
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const text = await res.text(); // <-- see exact error from API/function
+    if (!res.ok) {
+      console.error(`Submit failed ${res.status}:`, text);
+      alert(`Error al enviar el formulario (${res.status}). Revisa la consola.`);
+      return;
+    }
+
+    console.log('Submit OK:', text);
+    alert('Formulario enviado con éxito');
+    setOpenDialog(false);
+  } catch (err) {
+    console.error('Submit crash:', err);
+    alert('Error al enviar el formulario (network/client).');
+  }
+};
+
 
 
   const sendMessage = async (customInput) => {
@@ -121,40 +174,6 @@ export default function App() {
     setInput(question)
     sendMessage(question)
   }
-
-  // const renderForm = () => {
-  //   const fieldStyle = { fontFamily: 'Manrope, sans-serif' }
-  //   switch (activeTab) {
-  //     case 0:
-  //       return (
-  //         <>
-  //           <TextField fullWidth margin="dense" label="Nombre" variant="outlined" InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="Apellidos" variant="outlined" InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="E-mail" variant="outlined" InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="Teléfono" variant="outlined" InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="Semana de embarazo" variant="outlined" InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="Nombre de Ginecólogo" variant="outlined" InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="Teléfonos de contacto" variant="outlined" InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="Hospital donde se atenderá" variant="outlined" InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="Mensaje" variant="outlined" multiline rows={4} InputProps={{ style: fieldStyle }} />
-  //         </>
-  //       )
-  //     case 1:
-  //     case 2:
-  //       return (
-  //         <>
-  //           <TextField fullWidth margin="dense" label="Nombre" variant="outlined"  InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="Apellidos" variant="outlined" InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="E-mail" variant="outlined" InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="Teléfono" variant="outlined" InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="Teléfonos de contacto" variant="outlined" InputProps={{ style: fieldStyle }} />
-  //           <TextField fullWidth margin="dense" label="Mensaje" variant="outlined" multiline rows={4} InputProps={{ style: fieldStyle }} />
-  //         </>
-  //       )
-  //     default:
-  //       return null
-  //   }
-  // }
 
   const renderForm = () => activeTab === 0 ? (
     <>
