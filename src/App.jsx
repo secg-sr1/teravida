@@ -111,57 +111,90 @@ export default function App() {
   //   } catch { alert('Error al enviar el formulario') }
   // }
 
-  const handleSubmit = async () => {
-  let endpoint = '';
-  let payload = {};
+  async function sendContact(formData, origen) {
+  const res = await fetch('/api/contact', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...formData, origen }) // e.g. 'Criopreservación'
+  });
 
-  if (activeTab === 0) {
-    endpoint = '/api/criopreservacion';
-    payload = { ...formData };
-  } else if (activeTab === 1) {
-    endpoint = '/api/terapia_celular';
-    payload = {
-      nombre: formData.nombre,
-      apellidos: formData.apellidos,
-      email: formData.email,
-      telefono: formData.telefono,
-      telefonos_de_contacto: formData.telefonos_de_contacto,
-      mensaje: formData.mensaje ?? ''
-    };
-  } else if (activeTab === 2) {
-    endpoint = '/api/pruebas_geneticas';
-    payload = {
-      nombre: formData.nombre,
-      apellidos: formData.apellidos,
-      email: formData.email,
-      telefono: formData.telefono,
-      telefonos_de_contacto: formData.telefonos_de_contacto,
-      mensaje: formData.mensaje ?? ''
-    };
-  }
+  const json = await res.json();
+  if (!res.ok || !json.ok) throw new Error(json.error || 'Send failed');
+  return json;
+}
+
+
+const handleSubmit = async () => {
+  const origen =
+    activeTab === 0 ? 'Criopreservación' :
+    activeTab === 1 ? 'Terapia Celular' :
+    'Pruebas Genéticas';
 
   try {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    const text = await res.text(); // <-- see exact error from API/function
-    if (!res.ok) {
-      console.error(`Submit failed ${res.status}:`, text);
-      alert(`Error al enviar el formulario (${res.status}). Revisa la consola.`);
-      return;
-    }
-
-    console.log('Submit OK:', text);
+    await sendContact(formData, origen);
     alert('Formulario enviado con éxito');
     setOpenDialog(false);
   } catch (err) {
-    console.error('Submit crash:', err);
-    alert('Error al enviar el formulario (network/client).');
+    console.error(err);
+    alert('Error al enviar el formulario');
   }
 };
+
+
+
+//   const handleSubmit = async () => {
+//   let endpoint = '';
+//   let payload = {};
+
+  
+
+//   if (activeTab === 0) {
+//     endpoint = '/api/criopreservacion';
+//     payload = { ...formData };
+//   } else if (activeTab === 1) {
+//     endpoint = '/api/terapia_celular';
+//     payload = {
+//       nombre: formData.nombre,
+//       apellidos: formData.apellidos,
+//       email: formData.email,
+//       telefono: formData.telefono,
+//       telefonos_de_contacto: formData.telefonos_de_contacto,
+//       mensaje: formData.mensaje ?? ''
+//     };
+//   } else if (activeTab === 2) {
+//     endpoint = '/api/pruebas_geneticas';
+//     payload = {
+//       nombre: formData.nombre,
+//       apellidos: formData.apellidos,
+//       email: formData.email,
+//       telefono: formData.telefono,
+//       telefonos_de_contacto: formData.telefonos_de_contacto,
+//       mensaje: formData.mensaje ?? ''
+//     };
+//   }
+
+//   try {
+//     const res = await fetch(endpoint, {
+//       method: 'POST',
+//       headers: { 'Content-Type': 'application/json' },
+//       body: JSON.stringify(payload)
+//     });
+
+//     const text = await res.text(); // <-- see exact error from API/function
+//     if (!res.ok) {
+//       console.error(`Submit failed ${res.status}:`, text);
+//       alert(`Error al enviar el formulario (${res.status}). Revisa la consola.`);
+//       return;
+//     }
+
+//     console.log('Submit OK:', text);
+//     alert('Formulario enviado con éxito');
+//     setOpenDialog(false);
+//   } catch (err) {
+//     console.error('Submit crash:', err);
+//     alert('Error al enviar el formulario (network/client).');
+//   }
+// };
 
 
 
