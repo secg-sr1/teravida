@@ -45,6 +45,47 @@ function AutoOrbitCamera() {
   return null
 }
 
+
+const TABS = {
+  CRIO: 0,
+  TERAPIA: 1,
+  GENETICAS: 2,
+};
+
+// Field configs for each tab
+const FIELD_SETS = {
+  [TABS.CRIO]: [
+    { name: 'nombre',  label: 'Nombre',               required: true },
+    { name: 'apellidos', label: 'Apellidos' },
+    { name: 'email',   label: 'E-mail',              required: true, type: 'email' },
+    { name: 'telefono', label: 'Teléfono' },
+    { name: 'semana_de_embarazo', label: 'Semana de embarazo', type: 'number' },
+    { name: 'nombre_de_ginecologo', label: 'Nombre de Ginecólogo' },
+    { name: 'telefonos_de_contacto', label: 'Teléfonos de contacto' },
+  ],
+
+  [TABS.TERAPIA]: [
+    { name: 'nombre',  label: 'Nombre',               required: true },
+    { name: 'apellidos', label: 'Apellidos' },
+    { name: 'email',   label: 'E-mail',              required: true, type: 'email' },
+    { name: 'telefono', label: 'Teléfono' },
+    { name: 'telefonos_de_contacto', label: 'Teléfonos de contacto' },
+    { name: 'mensaje', label: 'Mensaje', type: 'textarea' },
+  ],
+
+  // Pruebas genéticas = same as terapia
+  [TABS.GENETICAS]: [
+    { name: 'nombre',  label: 'Nombre',               required: true },
+    { name: 'apellidos', label: 'Apellidos' },
+    { name: 'email',   label: 'E-mail',              required: true, type: 'email' },
+    { name: 'telefono', label: 'Teléfono' },
+    { name: 'telefonos_de_contacto', label: 'Teléfonos de contacto' },
+    { name: 'mensaje', label: 'Mensaje', type: 'textarea' },
+  ],
+};
+
+
+
 export default function App() {
   const [prompt, setPrompt] = useState('')
   const [messages, setMessages] = useState([])
@@ -119,23 +160,81 @@ export default function App() {
 //   }
 // };
 
-  const handleSubmit = async () => {
-  const origen =
-    activeTab === 0 ? 'Criopreservación' :
-    activeTab === 1 ? 'Terapia Celular' : 'Pruebas Genéticas';
+//   const handleSubmit = async () => {
+//   const origen =
+//     activeTab === 0 ? 'Criopreservación' :
+//     activeTab === 1 ? 'Terapia Celular' : 'Pruebas Genéticas';
 
-  if (!formData.nombre?.trim()) { alert('Falta el nombre'); return; }
-  if (!formData.email?.trim())  { alert('Falta el e-mail'); return; }
+//   if (!formData.nombre?.trim()) { alert('Falta el nombre'); return; }
+//   if (!formData.email?.trim())  { alert('Falta el e-mail'); return; }
+
+//   try {
+//     await sendContact(formData, origen);
+//     alert('Formulario enviado con éxito');
+//     setOpenDialog(false);
+//   } catch (err) {
+//     console.error(err);
+//     alert('Error al enviar el formulario');
+//   }
+// };
+
+const handleSubmit = async () => {
+  // 1) Validate only required fields for the current tab
+  const required = FIELD_SETS[activeTab].filter(f => f.required).map(f => f.name);
+  const missing = required.filter(k => !String(formData[k] ?? '').trim());
+  if (missing.length) {
+    alert(`Faltan campos: ${missing.join(', ')}`);
+    return;
+  }
+
+  // 2) Set "origen" label for the email subject
+  const origen =
+    activeTab === TABS.CRIO     ? 'Criopreservación' :
+    activeTab === TABS.TERAPIA  ? 'Terapia Celular'  :
+                                  'Pruebas Genéticas';
+
+  // 3) Shape the payload for /api/contact per tab
+  let payload;
+
+  if (activeTab === TABS.CRIO) {
+    payload = {
+      nombre: formData.nombre,
+      apellidos: formData.apellidos,
+      email: formData.email,
+      telefono: formData.telefono,
+      telefonos_de_contacto: formData.telefonos_de_contacto,
+      semana_de_embarazo: formData.semana_de_embarazo,
+      nombre_de_ginecologo: formData.nombre_de_ginecologo,
+      mensaje: '', // optional for this tab
+    };
+  } else {
+    // Terapia Celular + Pruebas Genéticas
+    payload = {
+      nombre: formData.nombre,
+      apellidos: formData.apellidos,
+      email: formData.email,
+      telefono: formData.telefono,
+      telefonos_de_contacto: formData.telefonos_de_contacto,
+      mensaje: formData.mensaje || '',
+    };
+  }
 
   try {
-    await sendContact(formData, origen);
+    // Call your email function (Resend)
+    await sendContact(payload, origen);
+
     alert('Formulario enviado con éxito');
     setOpenDialog(false);
+    // optional: clear only the fields for the current tab
+    const cleared = { ...formData };
+    FIELD_SETS[activeTab].forEach(f => { cleared[f.name] = '' });
+    setFormData(cleared);
   } catch (err) {
     console.error(err);
     alert('Error al enviar el formulario');
   }
 };
+
 
 
 
@@ -183,28 +282,51 @@ export default function App() {
     sendMessage(question)
   }
 
-  const renderForm = () => activeTab === 0 ? (
-    <>
-      <TextField fullWidth margin="dense" label="Nombre" value={formData.nombre} onChange={handleChange('nombre')} />
-      <TextField fullWidth margin="dense" label="Apellidos" value={formData.apellidos} onChange={handleChange('apellidos')} />
-      <TextField fullWidth margin="dense" label="E-mail" value={formData.email} onChange={handleChange('email')} />
-      <TextField fullWidth margin="dense" label="Teléfono" value={formData.telefono} onChange={handleChange('telefono')} />
-      <TextField fullWidth margin="dense" label="Semana de embarazo" value={formData.semana_de_embarazo} onChange={handleChange('semana_de_embarazo')} />
-      <TextField fullWidth margin="dense" label="Nombre de Ginecólogo" value={formData.nombre_de_ginecologo} onChange={handleChange('nombre_de_ginecologo')} />
-      <TextField fullWidth margin="dense" label="Teléfonos de contacto" value={formData.telefonos_de_contacto} onChange={handleChange('telefonos_de_contacto')} />
-      <TextField fullWidth margin="dense" label="Hospital donde se atenderá" value={formData.hospital_donde_se_atendera} onChange={handleChange('hospital_donde_se_atendera')} />
-      <TextField fullWidth margin="dense" label="Mensaje" multiline rows={4} value={formData.mensaje} onChange={handleChange('mensaje')} />
-    </>
-  ) : (
-    <>
-      <TextField fullWidth margin="dense" label="Nombre" value={formData.nombre} onChange={handleChange('nombre')} />
-      <TextField fullWidth margin="dense" label="Apellidos" value={formData.apellidos} onChange={handleChange('apellidos')} />
-      <TextField fullWidth margin="dense" label="E-mail" value={formData.email} onChange={handleChange('email')} />
-      <TextField fullWidth margin="dense" label="Teléfono" value={formData.telefono} onChange={handleChange('telefono')} />
-      <TextField fullWidth margin="dense" label="Teléfonos de contacto" value={formData.telefonos_de_contacto} onChange={handleChange('telefonos_de_contacto')} />
-      <TextField fullWidth margin="dense" label="Mensaje" multiline rows={4} value={formData.mensaje} onChange={handleChange('mensaje')} />
-    </>
-  )
+  // const renderForm = () => activeTab === 0 ? (
+  //   <>
+  //     <TextField fullWidth margin="dense" label="Nombre" value={formData.nombre} onChange={handleChange('nombre')} />
+  //     <TextField fullWidth margin="dense" label="Apellidos" value={formData.apellidos} onChange={handleChange('apellidos')} />
+  //     <TextField fullWidth margin="dense" label="E-mail" value={formData.email} onChange={handleChange('email')} />
+  //     <TextField fullWidth margin="dense" label="Teléfono" value={formData.telefono} onChange={handleChange('telefono')} />
+  //     <TextField fullWidth margin="dense" label="Semana de embarazo" value={formData.semana_de_embarazo} onChange={handleChange('semana_de_embarazo')} />
+  //     <TextField fullWidth margin="dense" label="Nombre de Ginecólogo" value={formData.nombre_de_ginecologo} onChange={handleChange('nombre_de_ginecologo')} />
+  //     <TextField fullWidth margin="dense" label="Teléfonos de contacto" value={formData.telefonos_de_contacto} onChange={handleChange('telefonos_de_contacto')} />
+  //     <TextField fullWidth margin="dense" label="Hospital donde se atenderá" value={formData.hospital_donde_se_atendera} onChange={handleChange('hospital_donde_se_atendera')} />
+  //     <TextField fullWidth margin="dense" label="Mensaje" multiline rows={4} value={formData.mensaje} onChange={handleChange('mensaje')} />
+  //   </>
+  // ) : (
+  //   <>
+  //     <TextField fullWidth margin="dense" label="Nombre" value={formData.nombre} onChange={handleChange('nombre')} />
+  //     <TextField fullWidth margin="dense" label="Apellidos" value={formData.apellidos} onChange={handleChange('apellidos')} />
+  //     <TextField fullWidth margin="dense" label="E-mail" value={formData.email} onChange={handleChange('email')} />
+  //     <TextField fullWidth margin="dense" label="Teléfono" value={formData.telefono} onChange={handleChange('telefono')} />
+  //     <TextField fullWidth margin="dense" label="Teléfonos de contacto" value={formData.telefonos_de_contacto} onChange={handleChange('telefonos_de_contacto')} />
+  //     <TextField fullWidth margin="dense" label="Mensaje" multiline rows={4} value={formData.mensaje} onChange={handleChange('mensaje')} />
+  //   </>
+  // )
+
+    const renderForm = () => (
+  <>
+    {FIELD_SETS[activeTab].map((f) => (
+      <TextField
+        key={f.name}
+        fullWidth
+        margin="dense"
+        label={f.label}
+        type={f.type === 'number' ? 'number' : f.type === 'email' ? 'email' : 'text'}
+        value={formData[f.name] ?? ''}
+        onChange={(e) =>
+          setFormData((prev) => ({ ...prev, [f.name]: e.target.value }))
+        }
+        required={!!f.required}
+        multiline={f.type === 'textarea'}
+        minRows={f.type === 'textarea' ? 4 : undefined}
+      />
+    ))}
+  </>
+);
+
+
 
 
 
