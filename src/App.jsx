@@ -109,9 +109,7 @@ export default function App() {
   const chatMaxWidth = isMobile ? '92vw' : isTablet ? 640 : 720
   const chipsMaxWidth = isMobile ? '92vw' : isTablet ? 640 : 720
   const promptMaxWidth = isMobile ? '92vw' : 600
-  const messagesBottom = isMobile ? 170 : 130
-  // const chipsBottom    = isMobile ? 120 : 80
-  // const promptBottom   = isMobile ? 20  : 28
+  const messagesBottom = isMobile ? 175 : 140
   const logoSize       = isMobile ? 64  : 140
   const bodyFontSize   = isMobile ? 13  : 14
 
@@ -144,39 +142,6 @@ export default function App() {
 }
 
 
-// const handleSubmit = async () => {
-//   const origen =
-//     activeTab === 0 ? 'Criopreservación' :
-//     activeTab === 1 ? 'Terapia Celular' :
-//     'Pruebas Genéticas';
-
-//   try {
-//     await sendContact(formData, origen);
-//     alert('Formulario enviado con éxito');
-//     setOpenDialog(false);
-//   } catch (err) {
-//     console.error(err);
-//     alert('Error al enviar el formulario');
-//   }
-// };
-
-//   const handleSubmit = async () => {
-//   const origen =
-//     activeTab === 0 ? 'Criopreservación' :
-//     activeTab === 1 ? 'Terapia Celular' : 'Pruebas Genéticas';
-
-//   if (!formData.nombre?.trim()) { alert('Falta el nombre'); return; }
-//   if (!formData.email?.trim())  { alert('Falta el e-mail'); return; }
-
-//   try {
-//     await sendContact(formData, origen);
-//     alert('Formulario enviado con éxito');
-//     setOpenDialog(false);
-//   } catch (err) {
-//     console.error(err);
-//     alert('Error al enviar el formulario');
-//   }
-// };
 
 const handleSubmit = async () => {
   // 1) Validate only required fields for the current tab
@@ -281,29 +246,6 @@ const handleSubmit = async () => {
     setInput(question)
     sendMessage(question)
   }
-
-  // const renderForm = () => activeTab === 0 ? (
-  //   <>
-  //     <TextField fullWidth margin="dense" label="Nombre" value={formData.nombre} onChange={handleChange('nombre')} />
-  //     <TextField fullWidth margin="dense" label="Apellidos" value={formData.apellidos} onChange={handleChange('apellidos')} />
-  //     <TextField fullWidth margin="dense" label="E-mail" value={formData.email} onChange={handleChange('email')} />
-  //     <TextField fullWidth margin="dense" label="Teléfono" value={formData.telefono} onChange={handleChange('telefono')} />
-  //     <TextField fullWidth margin="dense" label="Semana de embarazo" value={formData.semana_de_embarazo} onChange={handleChange('semana_de_embarazo')} />
-  //     <TextField fullWidth margin="dense" label="Nombre de Ginecólogo" value={formData.nombre_de_ginecologo} onChange={handleChange('nombre_de_ginecologo')} />
-  //     <TextField fullWidth margin="dense" label="Teléfonos de contacto" value={formData.telefonos_de_contacto} onChange={handleChange('telefonos_de_contacto')} />
-  //     <TextField fullWidth margin="dense" label="Hospital donde se atenderá" value={formData.hospital_donde_se_atendera} onChange={handleChange('hospital_donde_se_atendera')} />
-  //     <TextField fullWidth margin="dense" label="Mensaje" multiline rows={4} value={formData.mensaje} onChange={handleChange('mensaje')} />
-  //   </>
-  // ) : (
-  //   <>
-  //     <TextField fullWidth margin="dense" label="Nombre" value={formData.nombre} onChange={handleChange('nombre')} />
-  //     <TextField fullWidth margin="dense" label="Apellidos" value={formData.apellidos} onChange={handleChange('apellidos')} />
-  //     <TextField fullWidth margin="dense" label="E-mail" value={formData.email} onChange={handleChange('email')} />
-  //     <TextField fullWidth margin="dense" label="Teléfono" value={formData.telefono} onChange={handleChange('telefono')} />
-  //     <TextField fullWidth margin="dense" label="Teléfonos de contacto" value={formData.telefonos_de_contacto} onChange={handleChange('telefonos_de_contacto')} />
-  //     <TextField fullWidth margin="dense" label="Mensaje" multiline rows={4} value={formData.mensaje} onChange={handleChange('mensaje')} />
-  //   </>
-  // )
 
     const renderForm = () => (
   <>
