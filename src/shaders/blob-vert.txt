@@ -1,0 +1,19 @@
+precision mediump float;
+
+uniform float uTime;
+varying vec3 vNormal;
+varying vec3 vPos;
+
+void main() {
+  vec3 pos = position;
+  float distortion = sin(pos.x * 3.0 + uTime) * 0.05;
+  distortion += sin(pos.y * 5.0 + uTime) * 0.05;
+  distortion += sin(pos.z * 7.0 + uTime) * 0.05;
+
+  pos += normal * distortion;
+
+  vNormal = normal;
+  vPos = pos;
+
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+}

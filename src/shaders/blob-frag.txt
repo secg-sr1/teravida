@@ -1,0 +1,15 @@
+precision mediump float;
+
+uniform vec3 uColor;
+varying vec3 vNormal;
+varying vec3 vPos;
+
+void main() {
+  // Optional: angle-based rim lighting
+  float glow = pow(1.0 - dot(normalize(vNormal), vec3(0.0, 0.0, 1.0)), 2.0);
+
+  // Combine base and glow for soft highlight
+  vec3 color = uColor + glow * 2.0;
+
+  gl_FragColor = vec4(color, 1.0);
+}
