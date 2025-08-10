@@ -45,10 +45,20 @@
 //   }
 // }
 
-import { allowCors, postTo } from './_proxy';
+// import { allowCors, postTo } from './_proxy';
 
-export default async function handler(req, res) {
-  if (allowCors && req.method === 'OPTIONS') return allowCors(req, res);
+// export default async function handler(req, res) {
+//   if (allowCors && req.method === 'OPTIONS') return allowCors(req, res);
+//   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+//   return postTo('criopreservacion', req, res);
+// }
+
+
+const { postTo, handleCors } = require('./_proxy');
+
+module.exports = async (req, res) => {
+  if (req.method === 'OPTIONS') return handleCors(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
   return postTo('criopreservacion', req, res);
-}
+};
+

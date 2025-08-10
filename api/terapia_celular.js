@@ -31,10 +31,10 @@
 // }
 
 
-import { allowCors, postTo } from './_proxy';
+const { postTo, handleCors } = require('./_proxy');
 
-export default async function handler(req, res) {
-  if (allowCors && req.method === 'OPTIONS') return allowCors(req, res);
+module.exports = async (req, res) => {
+  if (req.method === 'OPTIONS') return handleCors(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
   return postTo('terapia_celular', req, res);
-}
+};
