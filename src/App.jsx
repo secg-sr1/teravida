@@ -23,6 +23,13 @@ import {
   Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button, Tabs, Tab
 } from '@mui/material'
 
+import Collapse from '@mui/material/Collapse';
+
+
+import { useTheme } from '@mui/material/styles'
+import useMediaQuery from '@mui/material/useMediaQuery'
+
+
 import Logo from './assets/STEM CARE-03.png'
 
 
@@ -46,7 +53,34 @@ export default function App() {
   const [openDialog, setOpenDialog] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
   const [formData, setFormData] = useState({ nombre: '', apellidos: '', email: '', telefono: '', semana_de_embarazo: '', nombre_de_ginecologo: '', telefonos_de_contacto: '', hospital_donde_se_atendera: '', mensaje: '' })
+  
+  // if you keep a system message, ignore it for the check
+  const hasConversation = messages.some(m => m.role === 'user' || m.role === 'assistant');
+
+
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))     // <=600px
+  const isTablet = useMediaQuery(theme.breakpoints.between('sm','md')) // 600–900px
+
+  
   const scrollRef = useRef()
+
+  const chatMaxWidth = isMobile ? '92vw' : isTablet ? 640 : 720
+  const chipsMaxWidth = isMobile ? '92vw' : isTablet ? 640 : 720
+  const promptMaxWidth = isMobile ? '92vw' : 600
+  const messagesBottom = isMobile ? 170 : 130
+  // const chipsBottom    = isMobile ? 120 : 80
+  // const promptBottom   = isMobile ? 20  : 28
+  const logoSize       = isMobile ? 64  : 140
+  const bodyFontSize   = isMobile ? 13  : 14
+
+  const promptHeight = isMobile ? 60 : 70 // estimated px height of prompt bar
+  const footerHeight = isMobile ? 20 : 24 // estimated px height of footer text
+
+  const promptBottom = footerHeight + 6   // 6px gap above footer
+  const chipsBottom  = promptBottom + promptHeight // 6px gap above prompt
+
+
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -217,9 +251,21 @@ export default function App() {
           }
         `}
       </style>
-      <img src={Logo} alt="Logo" style={{ position: 'absolute', top: 1, left: 16, height: 140, zIndex:1 }} />
+      {/* <img src={Logo} alt="Logo" style={{ position: 'absolute', top: 1, left: 16, height: 140, zIndex:1 }} /> */}
+      <img
+        src={Logo}
+        alt="Logo"
+        style={{
+          position: 'fixed',
+          top: isMobile ? 8 : 1,
+          left: isMobile ? 12 : 16,
+          height: logoSize,
+          zIndex: 1
+        }}
+      />
 
-      <footer style={{
+
+      {/* <footer style={{
         position: 'absolute',
         bottom: 0,
         width: '100%',
@@ -231,10 +277,40 @@ export default function App() {
         zIndex:1
       }}>
         © {new Date().getFullYear()} Supervisado por el Departamento de Investigación de Stem Care. |  Comprueba la información importante ó contáctanos. 
-      </footer>
+      </footer> */}
+      {/* <footer style={{
+        position: 'fixed',
+        bottom: 0,
+        width: '100%',
+        textAlign: 'center',
+        fontSize: isMobile ? 9 : 10,
+        padding: isMobile ? '6px 0' : '10px 0',
+        color: '#999',
+        fontFamily: 'Manrope, sans-serif',
+        zIndex: 1
+      }}>
+        © {new Date().getFullYear()} Supervisado por el Departamento de Investigación de Stem Care. |  Comprueba la información importante ó contáctanos.
+      </footer> */}
+      <footer style={{
+          position: 'fixed',
+          bottom: 0,
+          width: '100%',
+          textAlign: 'center',
+          fontSize: isMobile ? 9 : 10,
+          padding: '3px 0',
+          color: '#999',
+          fontFamily: 'Manrope, sans-serif',
+          height: footerHeight,
+          zIndex:1
+        }}>
+          © 2025 Supervisado por el Departamento de Investigación de Stem Care. |  Comprueba la información importante ó contáctanos.
+</footer>
+
+
 
       <Canvas
-        camera={{ position: [0, 0, 5], fov: 50 }}
+        // camera={{ position: [0, 0, 5], fov: 50 }}
+        camera={{ position: [0, 0, 5], fov: isMobile ? 55 : 50 }}
         gl={{ alpha: true, antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
         shadows
       >
@@ -253,7 +329,7 @@ export default function App() {
         </EffectComposer>
       </Canvas>
 
-      <Box
+      {/* <Box
         ref={scrollRef}
         sx={{
           position: 'absolute',
@@ -299,9 +375,49 @@ export default function App() {
             {m.content}
           </Typography>
         ))}
-      </Box>
+      </Box> */}
+      <Collapse in={hasConversation} timeout={300} unmountOnExit>
+        <Box
+          ref={scrollRef}
+          sx={{
+            position: 'fixed',
+            bottom: messagesBottom,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            px: 2,
+            maxHeight: isMobile ? '42vh' : '50vh',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%',
+            maxWidth: chatMaxWidth,
+            backdropFilter: 'blur(12px)',
+            backgroundColor: 'rgba(255,255,255,0.3)',
+            borderRadius: 2,
+            padding: 2,
+          }}
+        >
+          {messages.map((m,i)=>(
+            <Typography
+              key={i}
+              sx={{
+                mb: 1,
+                color: m.role === 'user' ? '#000' : '#565457ff',
+                fontFamily: 'Manrope',
+                fontWeight: m.role === 'user' ? 700 : 300,
+                textAlign: 'left',
+                whiteSpace: 'pre-line',
+                fontSize: bodyFontSize
+              }}
+            >
+              {m.content}
+            </Typography>
+          ))}
+        </Box>
+      </Collapse>
 
-      <Box
+
+      {/* <Box
         sx={{
           position: 'absolute',
           bottom: 80,
@@ -328,9 +444,36 @@ export default function App() {
             sx={{ fontFamily: 'Manrope' }}
           />
         ))}
-      </Box>
+      </Box> */}
 
       <Box
+         sx={{
+            position: 'fixed',
+            bottom: chipsBottom,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: isMobile ? 0.5 : 1,
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            maxWidth: chipsMaxWidth,
+            px: 2
+          }}
+      >
+        {['Beneficios de células madre','Terapia Celular','Pruebas Genéticas'].map((q,i)=>(
+          <Chip
+            key={i}
+            size={isMobile ? 'small' : 'medium'}
+            label={q}
+            variant="outlined"
+            onClick={() => handleChipClick(q)}
+            sx={{ fontFamily: 'Manrope' }}
+          />
+        ))}
+      </Box>
+
+
+      {/* <Box
         className="prompt-box"
         sx={{
           position: 'absolute',
@@ -350,6 +493,7 @@ export default function App() {
       >
         <TextField
           fullWidth
+          size={isMobile ? 'small' : 'medium'}
           variant="standard"
           placeholder="Pregunta sobre células madre"
           InputProps={{
@@ -369,9 +513,66 @@ export default function App() {
             )
           }}
         />
+      </Box> */}
+
+      <Box
+        className="prompt-box"
+        sx={{
+          // position: 'fixed',
+          // bottom: promptBottom,
+          // left: '50%',
+          // transform: 'translateX(-50%)',
+          // display: 'flex',
+          // justifyContent: 'center',
+          // alignItems: 'center',
+          // bgcolor: '#f0f0f0ff',
+          // borderRadius: '20px',
+          // mx: 'auto',
+          // maxWidth: promptMaxWidth,
+          // width: '100%',
+          // px: 2,
+          // py: isMobile ? 0.75 : 1
+              position: 'fixed',
+              bottom: promptBottom,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              bgcolor: '#f0f0f0ff',
+              borderRadius: '20px',
+              mx: 'auto',
+              maxWidth: promptMaxWidth,
+              width: '100%',
+              px: 2,
+              py: isMobile ? 0.75 : 1
+        }}
+      >
+        <TextField
+          fullWidth
+          variant="standard"
+          placeholder="Pregunta sobre células madre"
+          InputProps={{
+            disableUnderline: true,
+            sx: { ml: 1, color: '#202020', fontFamily: 'Manrope', fontSize: isMobile ? 13 : 14 },
+            value: input,
+            onChange: (e) => setInput(e.target.value),
+            onKeyDown: (e) => e.key === 'Enter' && sendMessage(),
+            endAdornment: (
+              <InputAdornment position="end">
+                <Tooltip title="Haz click para agendar tu consulta">
+                  <IconButton onClick={() => setOpenDialog(true)} size={isMobile ? 'small' : 'medium'}>
+                    <AccountCircleIcon sx={{ color: '#535353ff' }} />
+                  </IconButton>
+                </Tooltip>
+              </InputAdornment>
+            )
+          }}
+        />
       </Box>
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)}
+
+      {/* <Dialog open={openDialog} onClose={() => setOpenDialog(false)}
         PaperProps={{
           sx: {
             backdropFilter: 'blur(12px)',
@@ -383,15 +584,43 @@ export default function App() {
             
           }
         }}
-      >
+      > */}
+
+        <Dialog
+          open={openDialog}
+          onClose={() => setOpenDialog(false)}
+          fullScreen={isMobile}
+          PaperProps={{
+            sx: {
+              backdropFilter: 'blur(12px)',
+              backgroundColor: 'rgba(255, 255, 255, 0.92)',
+              borderRadius: isMobile ? 0 : 3,
+              px: isMobile ? 1.5 : 2,
+              py: isMobile ? 0.5 : 1,
+              fontFamily: 'Manrope',
+              width: isMobile ? '100vw' : undefined
+            }
+          }}
+        >
+
+
+      
         <DialogTitle sx={{fontFamily: 'Manrope'}}>Agendar Consulta</DialogTitle>
 
-        <Tabs
+        {/* <Tabs
           value={activeTab}
           onChange={(e, newValue) => setActiveTab(newValue)}
           variant="fullWidth"
           sx={{ borderBottom: 1, borderColor: 'divider' }}
+        > */}
+        <Tabs
+          value={activeTab}
+          onChange={(e, v) => setActiveTab(v)}
+          variant={isMobile ? 'scrollable' : 'fullWidth'}
+          scrollButtons={isMobile ? 'auto' : false}
+          sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
+
           <Tab label="Criopreservación" sx={{fontFamily: 'Manrope', fontWeight:700 }} />
           <Tab label="Terapia Celular" sx={{fontFamily: 'Manrope', fontWeight:700}}/>
           <Tab label="Pruebas Genéticas" sx={{fontFamily: 'Manrope', fontWeight:700}} />
