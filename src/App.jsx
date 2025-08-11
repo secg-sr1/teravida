@@ -390,15 +390,15 @@ const handleSubmit = async () => {
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeRaw]}
               components={{
-                p: ({node, ...props}) => <Typography {...props} sx={{ m:0, mb:1, fontWeight: m.role==='user'?700:300, fontSize: bodyFontSize }} />,
-                strong: ({node, ...props}) => <strong {...props} />,
-                h1: ({node, ...props}) => <Typography variant="h6" sx={{ fontWeight:700 }} {...props} />,
-                h2: ({node, ...props}) => <Typography variant="subtitle1" sx={{ fontWeight:700 }} {...props} />,
-                h3: ({node, ...props}) => <Typography variant="subtitle2" sx={{ fontWeight:700 }} {...props} />,
-                ol: ({node, ...props}) => <ol {...props} />,
-                ul: ({node, ...props}) => <ul {...props} />,
-                li: ({node, ...props}) => <li {...props} />,
-                a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" {...props} />
+                p: ({node, ...props}) => <Typography {...props} sx={{ m:0, mb:1, fontWeight: m.role==='user'?700:300, fontSize: bodyFontSize, fontFamily: 'Manrope, sans-serif' }} />,
+                strong: ({node, ...props}) => <strong {...props} style={{fontFamily: 'Manrope, sans-serif'}}/>,
+                h1: ({node, ...props}) => <Typography variant="h6" sx={{ fontWeight:700, fontFamily: 'Manrope, sans-serif' }} {...props} />,
+                h2: ({node, ...props}) => <Typography variant="subtitle1" sx={{ fontWeight:700, fontFamily: 'Manrope, sans-serif' }} {...props} />,
+                h3: ({node, ...props}) => <Typography variant="subtitle2" sx={{ fontWeight:700, fontFamily: 'Manrope, sans-serif' }} {...props} />,
+                ol: ({node, ...props}) => <ol {...props} style={{fontFamily: 'Manrope, sans-serif'}} />,
+                ul: ({node, ...props}) => <ul {...props} style={{fontFamily: 'Manrope, sans-serif'}}/>,
+                li: ({node, ...props}) => <li {...props} style={{fontFamily: 'Manrope, sans-serif'}} />,
+                a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" {...props} style={{fontFamily: 'Manrope, sans-serif'}}/>
               }}
             >
               {m.content}
