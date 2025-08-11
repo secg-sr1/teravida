@@ -6,7 +6,7 @@ export default async function handler(req) {
     const { messages, language } = await req.json();
     const system =
       language === 'es'
-        ? 'Eres un asistente virtual de Stem Care. Responde en español con precisión y claridad.'
+        ? 'Eres un asistente virtual de Stem Care. Responde en español con precisión y claridad. Responde SIEMPRE en Markdown claro con títulos y listas cuando ayude. Evita respuestas que no tengan relación a células madre, terapia celular y pruebas genéticas'
         : 'You are a virtual assistant for Stem Care. Answer clearly and accurately in English.';
 
     const upstream = await fetch('https://api.openai.com/v1/chat/completions', {

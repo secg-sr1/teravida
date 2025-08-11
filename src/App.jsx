@@ -26,6 +26,12 @@ import {
 import Collapse from '@mui/material/Collapse';
 
 
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+
+
+
 import { useTheme } from '@mui/material/styles'
 import useMediaQuery from '@mui/material/useMediaQuery'
 
@@ -371,10 +377,32 @@ const handleSubmit = async () => {
                 fontWeight: m.role === 'user' ? 700 : 300,
                 textAlign: 'left',
                 whiteSpace: 'pre-line',
-                fontSize: bodyFontSize
+                fontSize: bodyFontSize,
+                '& h1, & h2, & h3': { fontWeight: 700, mt: 1.2, mb: 0.6 },
+                '& p': { m: 0, mb: 1, lineHeight: 1.6, fontSize: bodyFontSize },
+                '& ol, & ul': { pl: 3, mb: 1, lineHeight: 1.6, fontSize: bodyFontSize },
+                '& li': { mb: 0.5 },
+                '& strong': { fontWeight: 700 },
+                '& a': { textDecoration: 'underline' }
+              }}
+            >
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw]}
+              components={{
+                p: ({node, ...props}) => <Typography {...props} sx={{ m:0, mb:1, fontWeight: m.role==='user'?700:300, fontSize: bodyFontSize }} />,
+                strong: ({node, ...props}) => <strong {...props} />,
+                h1: ({node, ...props}) => <Typography variant="h6" sx={{ fontWeight:700 }} {...props} />,
+                h2: ({node, ...props}) => <Typography variant="subtitle1" sx={{ fontWeight:700 }} {...props} />,
+                h3: ({node, ...props}) => <Typography variant="subtitle2" sx={{ fontWeight:700 }} {...props} />,
+                ol: ({node, ...props}) => <ol {...props} />,
+                ul: ({node, ...props}) => <ul {...props} />,
+                li: ({node, ...props}) => <li {...props} />,
+                a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" {...props} />
               }}
             >
               {m.content}
+            </ReactMarkdown>
             </Typography>
           ))}
         </Box>

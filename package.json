@@ -24,6 +24,9 @@
     "openai": "^5.12.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "rehype-raw": "^7.0.0",
+    "remark-gfm": "^4.0.1",
     "resend": "^6.0.1",
     "three": "^0.179.1",
     "vite-plugin-glsl": "^1.5.1"
