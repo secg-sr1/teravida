@@ -390,15 +390,46 @@ const handleSubmit = async () => {
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeRaw]}
               components={{
-                p: ({node, ...props}) => <Typography {...props} sx={{ m:0, mb:1, fontWeight: m.role==='user'?700:300, fontSize: bodyFontSize, fontFamily: 'Manrope, sans-serif' }} />,
-                strong: ({node, ...props}) => <strong {...props} style={{fontFamily: 'Manrope, sans-serif'}}/>,
-                h1: ({node, ...props}) => <Typography variant="h6" sx={{ fontWeight:700, fontFamily: 'Manrope, sans-serif' }} {...props} />,
-                h2: ({node, ...props}) => <Typography variant="subtitle1" sx={{ fontWeight:700, fontFamily: 'Manrope, sans-serif' }} {...props} />,
-                h3: ({node, ...props}) => <Typography variant="subtitle2" sx={{ fontWeight:700, fontFamily: 'Manrope, sans-serif' }} {...props} />,
-                ol: ({node, ...props}) => <ol {...props} style={{fontFamily: 'Manrope, sans-serif'}} />,
-                ul: ({node, ...props}) => <ul {...props} style={{fontFamily: 'Manrope, sans-serif'}}/>,
-                li: ({node, ...props}) => <li {...props} style={{fontFamily: 'Manrope, sans-serif'}} />,
-                a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" {...props} style={{fontFamily: 'Manrope, sans-serif'}}/>
+                ol: ({node, ...props}) => (
+                  <ol
+                    style={{
+                      paddingLeft: '1.5rem',
+                      marginTop: 0,
+                      marginBottom: '0.5rem', // margen reducido
+                      lineHeight: 1.6
+                    }}
+                    {...props}
+                  />
+                ),
+                ul: ({node, ...props}) => (
+                  <ul
+                    style={{
+                      paddingLeft: '1.5rem',
+                      marginTop: 0,
+                      marginBottom: '0.5rem', // margen reducido
+                      lineHeight: 1.6
+                    }}
+                    {...props}
+                  />
+                ),
+                li: ({node, ...props}) => (
+                  <li
+                    style={{
+                      marginBottom: '0.3rem', // menos espacio entre bullets
+                    }}
+                    {...props}
+                  />
+                ),
+                p: ({node, ...props}) => (
+                  <p
+                    style={{
+                      marginTop: 0,
+                      marginBottom: '0.5rem', // margen compacto para párrafos
+                    }}
+                    {...props}
+                  />
+                ),
+                strong: ({node, ...props}) => <strong {...props} />
               }}
             >
               {m.content}
