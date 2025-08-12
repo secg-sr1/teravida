@@ -395,8 +395,9 @@ const handleSubmit = async () => {
                     style={{
                       paddingLeft: '1.5rem',
                       marginTop: 0,
-                      marginBottom: '0.5rem', // margen reducido
-                      lineHeight: 1.6
+                      // marginBottom: '0.5rem', // margen reducido
+                      marginBottom: 0.35,
+                      lineHeight: 1.45
                     }}
                     {...props}
                   />
@@ -424,7 +425,7 @@ const handleSubmit = async () => {
                   <p
                     style={{
                       marginTop: 0,
-                      marginBottom: '0.5rem', // margen compacto para párrafos
+                      marginBottom: '0.4rem', // margen compacto para párrafos
                     }}
                     {...props}
                   />
