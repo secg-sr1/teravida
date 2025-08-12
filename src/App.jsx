@@ -347,7 +347,7 @@ const handleSubmit = async () => {
       </Canvas>
 
       <Collapse in={hasConversation} timeout={300} unmountOnExit>
-        {/* <Box
+        <Box
           ref={scrollRef}
           sx={{
             position: 'fixed',
@@ -436,87 +436,7 @@ const handleSubmit = async () => {
             </ReactMarkdown>
             </Typography>
           ))}
-        </Box> */}
-
-        <Box
-          ref={scrollRef}
-          sx={{
-            position: 'fixed',
-            bottom: messagesBottom,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            px: 2,
-            maxHeight: isMobile ? '42vh' : '50vh',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            width: '100%',
-            maxWidth: chatMaxWidth,
-            backdropFilter: 'blur(12px)',
-            backgroundColor: 'rgba(255,255,255,0.3)',
-            borderRadius: 2,
-            p: 2,
-          }}
-        >
-          {messages.map((m, i) => {
-            const first = m.content?.trim().split('\n')[0] || '';
-            const isHeading = first.startsWith('#') || first.startsWith('**');
-
-            return (
-              <Box
-                key={i}
-                sx={{
-                  mb: 1.5,
-                  color: m.role === 'user' ? '#000' : '#565457ff',
-                  fontFamily: 'Manrope',
-                  textAlign: 'left',
-                }}
-              >
-                {/* Optional: render a manual title only if content doesn't already start with a heading */}
-                {!isHeading && m.title && m.role !== 'user' && (
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
-                    {m.title}
-                  </Typography>
-                )}
-
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw]}
-                  components={{
-                    p: (props) => (
-                      <Typography
-                        sx={{ m: 0, mb: 1, lineHeight: 1.6, fontWeight: m.role === 'user' ? 700 : 300, fontSize: bodyFontSize }}
-                        {...props}
-                      />
-                    ),
-                    h1: (props) => <Typography variant="h4" sx={{ fontWeight: 800, mt: 1, mb: 0.6 }} {...props} />,
-                    h2: (props) => <Typography variant="h5" sx={{ fontWeight: 800, mt: 1, mb: 0.6 }} {...props} />,
-                    h3: (props) => <Typography variant="h6" sx={{ fontWeight: 800, mt: 1, mb: 0.6 }} {...props} />,
-                    ol: (props) => (
-                      <Box component="ol" sx={{ pl: '1.5rem', mt: 0, mb: '0.5rem', lineHeight: 1.6, fontSize: bodyFontSize }} {...props} />
-                    ),
-                    ul: (props) => (
-                      <Box component="ul" sx={{ pl: '1.5rem', mt: 0, mb: '0.5rem', lineHeight: 1.6, fontSize: bodyFontSize }} {...props} />
-                    ),
-                    li: (props) => <Box component="li" sx={{ mb: '0.3rem' }} {...props} />,
-                    strong: (props) => <strong {...props} />,
-                    a: (props) => <a target="_blank" rel="noopener noreferrer" {...props} />,
-                  }}
-                >
-                  {m.content}
-                </ReactMarkdown>
-              </Box>
-            );
-          })}
         </Box>
-
-
-
-        
-        
-
-
-
       </Collapse>
 
       <Box
