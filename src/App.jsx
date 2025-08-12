@@ -386,7 +386,7 @@ const handleSubmit = async () => {
                 '& a': { textDecoration: 'underline' }
               }}
             >
-            <ReactMarkdown
+            {/* <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeRaw]}
               components={{
@@ -395,9 +395,8 @@ const handleSubmit = async () => {
                     style={{
                       paddingLeft: '1.5rem',
                       marginTop: 0,
-                      // marginBottom: '0.5rem', // margen reducido
-                      marginBottom: 0.35,
-                      lineHeight: 1.45
+                      marginBottom: '0.5rem', // margen reducido
+                      lineHeight: 1.6
                     }}
                     {...props}
                   />
@@ -425,7 +424,7 @@ const handleSubmit = async () => {
                   <p
                     style={{
                       marginTop: 0,
-                      marginBottom: '0.4rem', // margen compacto para párrafos
+                      marginBottom: '0.5rem', // margen compacto para párrafos
                     }}
                     {...props}
                   />
@@ -434,6 +433,52 @@ const handleSubmit = async () => {
               }}
             >
               {m.content}
+            </ReactMarkdown> */}
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw]}
+              components={{
+                p: (props) => (
+                  <Typography
+                    sx={{
+                      m: 0,
+                      mb: 0.35,          // was ~1
+                      lineHeight: 1.45,  // a bit tighter
+                      fontWeight: m.role === 'user' ? 700 : 300,
+                      fontSize: bodyFontSize,
+                    }}
+                    {...props}
+                  />
+                ),
+                h1: (props) => (
+                  <Typography variant="h4" sx={{ mt: 0.4, mb: 0.35, fontWeight: 800 }} {...props} />
+                ),
+                h2: (props) => (
+                  <Typography variant="h5" sx={{ mt: 0.4, mb: 0.35, fontWeight: 800 }} {...props} />
+                ),
+                h3: (props) => (
+                  <Typography variant="h6" sx={{ mt: 0.35, mb: 0.3, fontWeight: 800 }} {...props} />
+                ),
+                ol: (props) => (
+                  <Box
+                    component="ol"
+                    sx={{ pl: '1.25rem', mt: 0, mb: 0.45, lineHeight: 1.5, fontSize: bodyFontSize }}
+                    {...props}
+                  />
+                ),
+                ul: (props) => (
+                  <Box
+                    component="ul"
+                    sx={{ pl: '1.25rem', mt: 0, mb: 0.45, lineHeight: 1.5, fontSize: bodyFontSize }}
+                    {...props}
+                  />
+                ),
+                li: (props) => <Box component="li" sx={{ mb: 0.25 }} {...props} />,
+                strong: (props) => <strong {...props} />,
+                a: (props) => <a target="_blank" rel="noopener noreferrer" {...props} />,
+              }}
+            >
+              {m.content} 
             </ReactMarkdown>
             </Typography>
           ))}
