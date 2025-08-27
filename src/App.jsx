@@ -14,8 +14,6 @@ import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
 import InputAdornment from '@mui/material/InputAdornment'
-import MicIcon from '@mui/icons-material/Mic'
-import GraphicEqIcon from '@mui/icons-material/GraphicEq'
 import CircularProgress from '@mui/material/CircularProgress'
 import Chip from '@mui/material/Chip'
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -274,27 +272,6 @@ const handleSubmit = async () => {
     setInput(question)
     sendMessage(question)
   }
-
-//     const renderForm = () => (
-//   <>
-//     {FIELD_SETS[activeTab].map((f) => (
-//       <TextField
-//         key={f.name}
-//         fullWidth
-//         margin="dense"
-//         label={f.label}
-//         type={f.type === 'number' ? 'number' : f.type === 'email' ? 'email' : 'text'}
-//         value={formData[f.name] ?? ''}
-//         onChange={(e) =>
-//           setFormData((prev) => ({ ...prev, [f.name]: e.target.value }))
-//         }
-//         required={!!f.required}
-//         multiline={f.type === 'textarea'}
-//         minRows={f.type === 'textarea' ? 4 : undefined}
-//       />
-//     ))}
-//   </>
-// );
 
 const renderForm = () => {
   const isCrio = activeTab === TABS.CRIO;
