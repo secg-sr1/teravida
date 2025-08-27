@@ -20,7 +20,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Chip from '@mui/material/Chip'
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import {
-  Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button, Tabs, Tab
+  Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button, Tabs, Tab, Grid
 } from '@mui/material'
 
 import Collapse from '@mui/material/Collapse';
@@ -38,6 +38,28 @@ import useMediaQuery from '@mui/material/useMediaQuery'
 
 import Logo from './assets/STEM CARE-03.png'
 
+const TF_FILLED_SX = {
+  '& .MuiFilledInput-root': {
+    borderRadius: 2,
+    backgroundColor: '#eef2f6',
+    transition: 'background-color .2s',
+    '&:hover': { backgroundColor: '#e8eef5' },
+    '&.Mui-focused': { backgroundColor: '#eaf2ff' },
+  },
+  '& .MuiInputBase-input': { fontFamily: 'Manrope' },
+  '& .MuiInputLabel-root': { fontFamily: 'Manrope' },
+};
+
+const SECTION_TITLE_SX = {
+  fontFamily: 'Manrope',
+  fontSize: 10,
+  letterSpacing: 1,
+  fontWeight: 700,
+  color: '#6b7a8c',
+  mb: 1,
+  mt: 2,
+  textTransform: 'uppercase',
+};
 
 
 function AutoOrbitCamera() {
@@ -253,26 +275,133 @@ const handleSubmit = async () => {
     sendMessage(question)
   }
 
-    const renderForm = () => (
-  <>
-    {FIELD_SETS[activeTab].map((f) => (
+//     const renderForm = () => (
+//   <>
+//     {FIELD_SETS[activeTab].map((f) => (
+//       <TextField
+//         key={f.name}
+//         fullWidth
+//         margin="dense"
+//         label={f.label}
+//         type={f.type === 'number' ? 'number' : f.type === 'email' ? 'email' : 'text'}
+//         value={formData[f.name] ?? ''}
+//         onChange={(e) =>
+//           setFormData((prev) => ({ ...prev, [f.name]: e.target.value }))
+//         }
+//         required={!!f.required}
+//         multiline={f.type === 'textarea'}
+//         minRows={f.type === 'textarea' ? 4 : undefined}
+//       />
+//     ))}
+//   </>
+// );
+
+const renderForm = () => {
+  const isCrio = activeTab === TABS.CRIO;
+
+  return (
+    <Box sx={{ pt: 1 }}>
+      {/* DATOS DE CONTACTO */}
+      <Typography sx={SECTION_TITLE_SX}>Datos de contacto</Typography>
+      <Box component={Grid} container spacing={2}>
+        <Grid item xs={12} md={4}>
+          <TextField
+            fullWidth variant="filled" label="Nombre"
+            required value={formData.nombre || ''}
+            onChange={(e)=>setFormData(p=>({...p,nombre:e.target.value}))}
+            sx={TF_FILLED_SX}
+          />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <TextField
+            fullWidth variant="filled" label="Apellidos"
+            value={formData.apellidos || ''}
+            onChange={(e)=>setFormData(p=>({...p,apellidos:e.target.value}))}
+            sx={TF_FILLED_SX}
+          />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <TextField
+            fullWidth variant="filled" label="E-mail" type="email"
+            required value={formData.email || ''}
+            onChange={(e)=>setFormData(p=>({...p,email:e.target.value}))}
+            sx={TF_FILLED_SX}
+          />
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <TextField
+            fullWidth variant="filled" label="Teléfono"
+            placeholder="+502 5555 5555"
+            value={formData.telefono || ''}
+            onChange={(e)=>setFormData(p=>({...p,telefono:e.target.value}))}
+            helperText="Sólo números o +; ej: +502 5555 5555"
+            sx={TF_FILLED_SX}
+          />
+        </Grid>
+      </Box>
+
+      {/* INFORMACIÓN MÉDICA */}
+      <Typography sx={SECTION_TITLE_SX}>Información médica</Typography>
+      <Box component={Grid} container spacing={2}>
+        {isCrio && (
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth variant="filled" type="number"
+              label="Semana de Embarazo"
+              value={formData.semana_de_embarazo || ''}
+              onChange={(e)=>setFormData(p=>({...p,semana_de_embarazo:e.target.value}))}
+              helperText="Opcional"
+              sx={TF_FILLED_SX}
+            />
+          </Grid>
+        )}
+        <Grid item xs={12} md={4}>
+          <TextField
+            fullWidth variant="filled" label="Nombre de Ginecólogo"
+            value={formData.nombre_de_ginecologo || ''}
+            onChange={(e)=>setFormData(p=>({...p,nombre_de_ginecologo:e.target.value}))}
+            helperText="Opcional"
+            sx={TF_FILLED_SX}
+          />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <TextField
+            fullWidth variant="filled" label="Teléfonos de Contacto"
+            value={formData.telefonos_de_contacto || ''}
+            onChange={(e)=>setFormData(p=>({...p,telefonos_de_contacto:e.target.value}))}
+            helperText="Opcional — separa con comas si son varios"
+            sx={TF_FILLED_SX}
+          />
+        </Grid>
+
+        {/* Hospital (solo lo mostramos en Criopreservación tal como tu formData soporta) */}
+        {isCrio && (
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth variant="filled" label="Hospital en donde se Atenderá"
+              value={formData.hospital_donde_se_atendera || ''}
+              onChange={(e)=>setFormData(p=>({...p,hospital_donde_se_atendera:e.target.value}))}
+              helperText="Opcional"
+              sx={TF_FILLED_SX}
+            />
+          </Grid>
+        )}
+      </Box>
+
+      {/* MENSAJE */}
+      <Typography sx={SECTION_TITLE_SX}>Mensaje</Typography>
       <TextField
-        key={f.name}
-        fullWidth
-        margin="dense"
-        label={f.label}
-        type={f.type === 'number' ? 'number' : f.type === 'email' ? 'email' : 'text'}
-        value={formData[f.name] ?? ''}
-        onChange={(e) =>
-          setFormData((prev) => ({ ...prev, [f.name]: e.target.value }))
-        }
-        required={!!f.required}
-        multiline={f.type === 'textarea'}
-        minRows={f.type === 'textarea' ? 4 : undefined}
+        fullWidth variant="filled" label="Mensaje"
+        multiline minRows={5}
+        value={formData.mensaje || ''}
+        onChange={(e)=>setFormData(p=>({...p,mensaje:e.target.value}))}
+        sx={TF_FILLED_SX}
       />
-    ))}
-  </>
-);
+    </Box>
+  );
+};
+
 
 
 
@@ -516,13 +645,20 @@ const handleSubmit = async () => {
           fullScreen={isMobile}
           PaperProps={{
             sx: {
+              // backdropFilter: 'blur(12px)',
+              // backgroundColor: 'rgba(255, 255, 255, 0.92)',
+              // borderRadius: isMobile ? 0 : 3,
+              // px: isMobile ? 1.5 : 2,
+              // py: isMobile ? 0.5 : 1,
+              // fontFamily: 'Manrope',
+              // width: isMobile ? '100vw' : undefined
               backdropFilter: 'blur(12px)',
-              backgroundColor: 'rgba(255, 255, 255, 0.92)',
-              borderRadius: isMobile ? 0 : 3,
-              px: isMobile ? 1.5 : 2,
-              py: isMobile ? 0.5 : 1,
-              fontFamily: 'Manrope',
-              width: isMobile ? '100vw' : undefined
+              backgroundColor: 'rgba(255,255,255,0.94)',
+              borderRadius: isMobile ? 0 : 2,
+              boxShadow: '0 8px 40px rgba(0,0,0,.08)',
+              px: isMobile ? 1.5 : 3,
+              py: isMobile ? 1 : 2,
+              border: '1px solid #78797bff',
             }
           }}
         >
@@ -538,12 +674,23 @@ const handleSubmit = async () => {
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
 
-          <Tab label="Criopreservación" sx={{fontFamily: 'Manrope', fontWeight:700 }} />
-          <Tab label="Terapia Celular" sx={{fontFamily: 'Manrope', fontWeight:700}}/>
-          <Tab label="Pruebas Genéticas" sx={{fontFamily: 'Manrope', fontWeight:700}} />
+          <Tab label="Criopreservación" sx={{fontFamily: 'Manrope,', fontWeight:500 }} />
+          <Tab label="Terapia Celular" sx={{fontFamily: 'Manrope', fontWeight:500}}/>
+          <Tab label="Pruebas Genéticas" sx={{fontFamily: 'Manrope', fontWeight:500}} />
         </Tabs>
 
-        <DialogContent sx={{fontFamily: 'Manrope'}}  >
+        {/* <DialogContent sx={{fontFamily: 'Manrope'}}  >
+          {renderForm()}
+        </DialogContent> */}
+
+        <DialogContent
+          sx={{
+            fontFamily: 'Manrope',
+            pt: 1,
+            pb: 2,
+            '& .MuiDialogContent-root': { p: 0 },
+          }}
+        >
           {renderForm()}
         </DialogContent>
 
