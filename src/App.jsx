@@ -153,7 +153,7 @@ export default function App() {
     }
   }, [messages])
 
-  const handleChange = (field) => (e) => setFormData({ ...formData, [field]: e.target.value })
+  // const handleChange = (field) => (e) => setFormData({ ...formData, [field]: e.target.value })
 
   async function sendContact(formData, origen) {
   const res = await fetch('/api/contact', {
@@ -380,10 +380,6 @@ const renderForm = () => {
 };
 
 
-
-
-
-
   return (
     <div className="container" style={{ fontFamily: 'Manrope, sans-serif' }}>
       <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;700&display=swap" rel="stylesheet" />
@@ -401,7 +397,6 @@ const renderForm = () => {
           }
         `}
       </style>
-      {/* <img src={Logo} alt="Logo" style={{ position: 'absolute', top: 1, left: 16, height: 140, zIndex:1 }} /> */}
       <img
         src={Logo}
         alt="Logo"
