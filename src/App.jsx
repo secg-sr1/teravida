@@ -645,13 +645,6 @@ const renderForm = () => {
           fullScreen={isMobile}
           PaperProps={{
             sx: {
-              // backdropFilter: 'blur(12px)',
-              // backgroundColor: 'rgba(255, 255, 255, 0.92)',
-              // borderRadius: isMobile ? 0 : 3,
-              // px: isMobile ? 1.5 : 2,
-              // py: isMobile ? 0.5 : 1,
-              // fontFamily: 'Manrope',
-              // width: isMobile ? '100vw' : undefined
               backdropFilter: 'blur(12px)',
               backgroundColor: 'rgba(255,255,255,0.94)',
               borderRadius: isMobile ? 0 : 2,
