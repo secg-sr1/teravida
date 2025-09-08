@@ -1,0 +1,652 @@
+// // /api/chat/stream.js
+// export const config = { runtime: 'edge' };
+
+// export default async function handler(req) {
+//   // CORS preflight (optional)
+//   if (req.method === 'OPTIONS') {
+//     return new Response(null, {
+//       status: 204,
+//       headers: {
+//         'Access-Control-Allow-Origin': '*',
+//         'Access-Control-Allow-Methods': 'POST, OPTIONS',
+//         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+//       },
+//     });
+//   }
+
+//   try {
+//     const { messages = [], language = 'es', context = '' } = await req.json();
+
+//     // -------------------------------
+//     // 1) Randomize contact prompts
+//     // -------------------------------
+//     const CONTACT_PROMPTS = [
+//       '[Hablar con especialista]',
+//       '[Solicitar llamada]',
+//       '[Resolver dudas por WhatsApp]',
+//       '[Consulta informativa]',
+//       '[Coordinar visita al laboratorio]',
+//       '[Quiero que me contacten]',
+//       '[Agendar orientación clínica]',
+//       '[Conversar con un médico]',
+//     ];
+
+//     const EDUCATIONAL_CHIPS = [
+//       '[Beneficios]',
+//       '[Aplicaciones]',
+//       '[Proceso de recolección]',
+//       '[Pruebas genéticas]',
+//       '[Autorizaciones y calidad]',
+//       '[Preguntas frecuentes]',
+//     ];
+
+//     function pickRandom(arr, kMin = 3, kMax = 5) {
+//       const k = Math.floor(Math.random() * (kMax - kMin + 1)) + kMin; // 3..5
+//       // simple shuffle copy
+//       const shuffled = arr.slice().sort(() => 0.5 - Math.random());
+//       return shuffled.slice(0, Math.min(k, shuffled.length));
+//     }
+
+//     // 40% chance to include contact prompts
+//     const CONTACT_MODE = Math.random() < 0.8 ? 'on' : 'off';
+//     const SELECTED_CONTACT_PROMPTS = CONTACT_MODE === 'on'
+//       ? pickRandom(CONTACT_PROMPTS, 3, 5)
+//       : [];
+
+//     const SELECTED_EDU_CHIPS = pickRandom(EDUCATIONAL_CHIPS, 3, 5);
+
+//     // Pre-build the exact quick-options string that the model should use
+//     // It always includes educational chips, and conditionally adds contact chips.
+//     const QUICK_OPTIONS_STRING =
+//       SELECTED_EDU_CHIPS.join(' ') +
+//       (SELECTED_CONTACT_PROMPTS.length ? ' ' + SELECTED_CONTACT_PROMPTS.join(' ') : '');
+
+//     // -------------------------------
+//     // 2) Domain facts (safe, no precios)
+//     // -------------------------------
+//     const baseFacts = `
+// - Stem Care: primer y único banco privado de células madre de cordón umbilical en Guatemala (operando desde 2006).
+// - Traslado y procesamiento en <24h; almacenamiento en 5 críoviales; fase de vapor de nitrógeno.
+// - Equipo médico multidisciplinario con experiencia en recolección y trasplantes desde 2008.
+// - Laboratorio autorizado por MSPAS/DRACES y Colegio de Químicos Farmacéuticos; protocolos alineados a FDA/CBER.
+// - Cobertura 24/7 para recolección en Guatemala y El Salvador.
+// - Enfoque en educación del paciente, medicina regenerativa y pruebas genéticas (myNewborn, myPrenatal, myHealthScore).
+// `.trim();
+
+//     // -------------------------------
+//     // 3) Core policy (Spanish-first + structure)
+//     //    NOTE: we DO NOT hardcode contact chips anymore.
+//     //    We let QUICK_OPTIONS_STRING define what to show this turn.
+//     // -------------------------------
+//     const STRUCTURE_POLICY_ES = `
+// Eres un asistente virtual de Stem Care. Responde SIEMPRE en español, con precisión clínica y empatía.
+// Formato: usa Markdown con títulos breves, listas y párrafos cortos.
+
+// Alcance:
+// - Temas: criopreservación de sangre de cordón umbilical, aplicaciones terapéuticas de células madre, procesos clínicos, pruebas genéticas relacionadas y datos institucionales de Stem Care.
+// - NO des precios. Si preguntan por costos, explica con amabilidad que esa información se trata en una consulta informativa con el especialista.
+// - NO diagnostiques. Ofrece orientación general basada en evidencia y aclara límites.
+
+// Confianza:
+// - Cuando ayude, menciona brevemente credenciales verificables (p. ej., inicio 2006, trasplantes desde 2008, autorizaciones locales, protocolos tipo FDA/CBER).
+// - Usa lenguaje prudente (“la evidencia sugiere…”, “en algunos casos…”).
+
+// Estructura de cada respuesta:
+// 1) Resumen en 1–2 oraciones (lo esencial).
+// 2) Desarrollo educativo en viñetas o pasos.
+// 3) **Próximo paso sugerido**: invita de forma orgánica y sin presión a resolver dudas con un especialista (“consulta informativa, sin compromiso”) SOLO si se siente natural por el contexto.
+// 4) **Opciones rápidas**: cierra SIEMPRE con esta línea exacta (sin modificar el orden ni el texto de cada chip):
+// **Opciones rápidas:** ${QUICK_OPTIONS_STRING}
+
+// Reglas de chips:
+// - Los chips educativos siempre deben mostrarse.
+// - Los chips de contacto SOLO deben aparecer si CONTACT_MODE=on. Si CONTACT_MODE=off, no los incluyas.
+// - Nunca inventes chips fuera de la lista que se te ha provisto para esta respuesta.
+
+// Marcado de intención (no visible para el usuario):
+// - Escribe en la 1ª línea un comentario HTML con una sola intención entre:
+//   intent=educar|proceso|aplicaciones|pruebas|hablar_especialista|fuera_de_alcance
+// - Ejemplo: <!--intent=proceso-->
+
+// Contexto:
+// - Si recibes "context" en el payload, úsalo como fuente prioritaria cuando sea relevante. No cites precios aunque aparezcan en el contexto.
+
+// Datos base de respaldo:
+// ${baseFacts}
+// `.trim();
+
+//     const STRUCTURE_POLICY_EN = `
+// You are a virtual assistant for Stem Care. Default to Spanish unless user explicitly asks for English. Be precise and empathetic. Never provide pricing; invite to a no-commitment informative consultation with a specialist instead. Use clear Markdown. Close with:
+// **Opciones rápidas:** ${QUICK_OPTIONS_STRING}
+// Only include contact-related chips if CONTACT_MODE=on. Start each answer with <!--intent=...-->.
+// `.trim();
+
+//     const system = language === 'es' ? STRUCTURE_POLICY_ES : STRUCTURE_POLICY_EN;
+
+//     // -------------------------------
+//     // 4) Build the message stack
+//     // -------------------------------
+//     const sysMessages = [{ role: 'system', content: system }];
+
+//     // Tell the model whether contact chips are allowed this turn
+//     sysMessages.push({
+//       role: 'system',
+//       content: `CONTACT_MODE=${CONTACT_MODE}`,
+//     });
+
+//     // Optional contextual payload (markdown excerpts, etc.)
+//     if (typeof context === 'string' && context.trim().length > 0) {
+//       const ctx = context.trim().slice(0, 7000);
+//       sysMessages.push({
+//         role: 'system',
+//         content:
+//           `Contexto de referencia (usar cuando sea relevante; omite precios si existieran):\n` + ctx,
+//       });
+//     }
+
+//     const body = {
+//       model: 'gpt-4o-mini',
+//       stream: true,
+//       messages: [
+//         ...sysMessages,
+//         ...messages.slice(-12),
+//       ],
+//     };
+
+//     // -------------------------------
+//     // 5) Stream from OpenAI
+//     // -------------------------------
+//     const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
+//       method: 'POST',
+//       headers: {
+//         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify(body),
+//     });
+
+//     if (!upstream.ok || !upstream.body) {
+//       const text = await upstream.text().catch(() => '');
+//       throw new Error(`Upstream error ${upstream.status}: ${text}`);
+//     }
+
+//     const reader = upstream.body.getReader();
+//     const encoder = new TextEncoder();
+//     const decoder = new TextDecoder();
+
+//     const stream = new ReadableStream({
+//       async start(controller) {
+//         let buffer = '';
+//         try {
+//           while (true) {
+//             const { value, done } = await reader.read();
+//             if (done) break;
+
+//             buffer += decoder.decode(value, { stream: true });
+//             const lines = buffer.split('\n');
+//             buffer = lines.pop() || '';
+
+//             for (const line of lines) {
+//               const s = line.trim();
+//               if (!s || !s.startsWith('data:')) continue;
+//               const data = s.slice(5).trim();
+//               if (data === '[DONE]') {
+//                 controller.close();
+//                 return;
+//               }
+//               try {
+//                 const json = JSON.parse(data);
+//                 const token = json.choices?.[0]?.delta?.content || '';
+//                 if (token) controller.enqueue(encoder.encode(token));
+//               } catch {
+//                 // ignore partial lines
+//               }
+//             }
+//           }
+//         } catch (err) {
+//           controller.error(err);
+//         } finally {
+//           controller.close();
+//         }
+//       },
+//     });
+
+//     return new Response(stream, {
+//       status: 200,
+//       headers: {
+//         'Content-Type': 'text/plain; charset=utf-8',
+//         'Cache-Control': 'no-cache, no-transform',
+//         'Access-Control-Allow-Origin': '*',
+//       },
+//     });
+//   } catch (err) {
+//     return new Response(
+//       JSON.stringify({
+//         error: 'Error contacting assistant.',
+//         detail: err?.message || String(err),
+//       }),
+//       {
+//         status: 500,
+//         headers: {
+//           'Content-Type': 'application/json; charset=utf-8',
+//           'Access-Control-Allow-Origin': '*',
+//         },
+//       }
+//     );
+//   }
+// }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// // /api/chat/stream.js
+// export const config = { runtime: 'edge' };
+
+// export default async function handler(req) {
+//   if (req.method === 'OPTIONS') {
+//     return new Response(null, {
+//       status: 204,
+//       headers: {
+//         'Access-Control-Allow-Origin': '*',
+//         'Access-Control-Allow-Methods': 'POST, OPTIONS',
+//         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+//       },
+//     });
+//   }
+
+//   try {
+//     const {
+//       messages = [],
+//       language = 'es',
+//       context = '',
+//       // NEW: knobs you control from the frontend
+//       cta_mode = 'auto',      // 'on' | 'off' | 'auto'
+//       cta_recent = false,     // true if a CTA appeared last turn
+//     } = await req.json();
+
+//     // ---------- Heuristics ----------
+//     const userTurns = messages.filter(m => m.role === 'user').length;
+
+//     // When on 'auto', allow CTA only after ≥2 user turns, not if cta_recent=true, and with 15% prob.
+//     const autoAllowed = (userTurns >= 2) && !cta_recent && (Math.random() < 0.15);
+//     const CONTACT_MODE = cta_mode === 'on' ? 'on'
+//                         : cta_mode === 'off' ? 'off'
+//                         : (autoAllowed ? 'on' : 'off');  // 'auto'
+
+//     const CONTACT_PROMPTS = [
+//       '[Hablar con especialista]',
+//       '[Solicitar llamada]',
+//       '[Resolver dudas por WhatsApp]',
+//       '[Consulta informativa]',
+//       '[Coordinar visita al laboratorio]',
+//       '[Agendar orientación clínica]',
+//     ];
+//     const EDUCATIONAL_CHIPS = [
+//       '[Beneficios]',
+//       '[Aplicaciones]',
+//       '[Proceso de recolección]',
+//       '[Pruebas genéticas]',
+//       '[Autorizaciones y calidad]',
+//       '[Preguntas frecuentes]',
+//     ];
+//     function pickRandom(arr, kMin = 3, kMax = 5) {
+//       const k = Math.floor(Math.random() * (kMax - kMin + 1)) + kMin;
+//       return arr.slice().sort(() => 0.5 - Math.random()).slice(0, Math.min(k, arr.length));
+//     }
+//     const SELECTED_EDU = pickRandom(EDUCATIONAL_CHIPS, 3, 5);
+//     const SELECTED_CONTACT = CONTACT_MODE === 'on' ? pickRandom(CONTACT_PROMPTS, 3, 5) : [];
+//     const QUICK_OPTIONS_STRING = SELECTED_EDU.concat(SELECTED_CONTACT).join(' ');
+
+//     // ---------- Safe domain facts (no prices) ----------
+//     const baseFacts = `
+// - Stem Care: primer y único banco privado de células madre de cordón umbilical en Guatemala (desde 2006).
+// - Procesamiento <24h; almacenamiento en 5 críoviales; fase de vapor de nitrógeno.
+// - Equipo con experiencia en recolección y trasplantes desde 2008.
+// - Autorizaciones MSPAS/DRACES y Colegio de Químicos Farmacéuticos; protocolos alineados a FDA/CBER.
+// - Cobertura 24/7 para recolección en Guatemala y El Salvador.
+// - Enfoque en educación, medicina regenerativa y pruebas genéticas (myNewborn, myPrenatal, myHealthScore).
+// `.trim();
+
+//     // ---------- System policy (no CTA unless CONTACT_MODE=on) ----------
+//     const STRUCTURE_POLICY_ES = `
+// Eres un asistente virtual de Stem Care. Responde SIEMPRE en español, con precisión clínica y empatía.
+// Usa Markdown con títulos breves, listas y párrafos cortos.
+
+// Alcance:
+// - Criopreservación de sangre de cordón umbilical, aplicaciones terapéuticas, procesos clínicos, pruebas genéticas relacionadas y datos institucionales.
+// - NO des precios. Si preguntan costos, indica amablemente que se ven en una consulta informativa con el especialista.
+// - NO diagnostiques. Ofrece orientación general basada en evidencia y aclara límites.
+
+// Confianza:
+// - Cuando ayude, menciona credenciales verificables (2006, trasplantes desde 2008, autorizaciones locales, protocolos tipo FDA/CBER).
+// - Usa lenguaje prudente (“la evidencia sugiere…”, “en algunos casos…”).
+
+// Estructura recomendada:
+// 1) Resumen en 1–2 oraciones.
+// 2) Desarrollo educativo en viñetas o pasos.
+// 3) Si y solo si CONTACT_MODE=on y el contexto lo amerita, añade una invitación suave a una consulta informativa (sin compromiso). Si CONTACT_MODE=off, NO invites a contactar.
+// 4) Cierra SIEMPRE con:
+// **Opciones rápidas:** ${QUICK_OPTIONS_STRING}
+
+// Reglas de chips:
+// - Los chips educativos siempre van.
+// - Chips de contacto SOLO si CONTACT_MODE=on (ya están prelistados). No inventes chips fuera de los listados.
+
+// Marcado de intención (no visible para el usuario):
+// - Primera línea: <!--intent=educar|proceso|aplicaciones|pruebas|hablar_especialista|fuera_de_alcance-->
+// - Si incluyes invitación de contacto, añade también <!--cta_shown--> en la primera línea.
+
+// Contexto:
+// - Si hay "context", úsalo como prioridad cuando sea relevante. Ignora precios aunque aparezcan.
+
+// Datos base de respaldo:
+// ${baseFacts}
+// `.trim();
+
+//     const STRUCTURE_POLICY_EN = `
+// You are a virtual assistant for Stem Care. Default to Spanish unless asked. Never provide pricing. Only invite to a no-commitment consultation if CONTACT_MODE=on and context warrants it. Close with:
+// **Opciones rápidas:** ${QUICK_OPTIONS_STRING}
+// Start each reply with <!--intent=...--> and add <!--cta_shown--> only when a CTA is actually shown.
+// `.trim();
+
+//     const system = language === 'es' ? STRUCTURE_POLICY_ES : STRUCTURE_POLICY_EN;
+
+//     // ---------- Build messages ----------
+//     const sysMessages = [
+//       { role: 'system', content: system },
+//       { role: 'system', content: `CONTACT_MODE=${CONTACT_MODE}` },
+//     ];
+
+//     if (typeof context === 'string' && context.trim()) {
+//       sysMessages.push({
+//         role: 'system',
+//         content: `Contexto de referencia (usar cuando sea relevante; omite precios si existieran):\n${context.trim().slice(0, 7000)}`
+//       });
+//     }
+
+//     const body = {
+//       model: 'gpt-4o-mini',
+//       stream: true,
+//       messages: [...sysMessages, ...messages.slice(-12)],
+//     };
+
+//     // ---------- Stream OpenAI ----------
+//     const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
+//       method: 'POST',
+//       headers: {
+//         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify(body),
+//     });
+
+//     if (!upstream.ok || !upstream.body) {
+//       const text = await upstream.text().catch(() => '');
+//       throw new Error(`Upstream error ${upstream.status}: ${text}`);
+//     }
+
+//     const reader = upstream.body.getReader();
+//     const encoder = new TextEncoder();
+//     const decoder = new TextDecoder();
+
+//     const stream = new ReadableStream({
+//       async start(controller) {
+//         let buffer = '';
+//         try {
+//           while (true) {
+//             const { value, done } = await reader.read();
+//             if (done) break;
+//             buffer += decoder.decode(value, { stream: true });
+//             const lines = buffer.split('\n');
+//             buffer = lines.pop() || '';
+//             for (const line of lines) {
+//               const s = line.trim();
+//               if (!s || !s.startsWith('data:')) continue;
+//               const data = s.slice(5).trim();
+//               if (data === '[DONE]') { controller.close(); return; }
+//               try {
+//                 const json = JSON.parse(data);
+//                 const token = json.choices?.[0]?.delta?.content || '';
+//                 if (token) controller.enqueue(encoder.encode(token));
+//               } catch { /* swallow */ }
+//             }
+//           }
+//         } catch (err) {
+//           controller.error(err);
+//         } finally {
+//           controller.close();
+//         }
+//       },
+//     });
+
+//     return new Response(stream, {
+//       status: 200,
+//       headers: {
+//         'Content-Type': 'text/plain; charset=utf-8',
+//         'Cache-Control': 'no-cache, no-transform',
+//         'Access-Control-Allow-Origin': '*',
+//       },
+//     });
+//   } catch (err) {
+//     return new Response(JSON.stringify({
+//       error: 'Error contacting assistant.',
+//       detail: err?.message || String(err),
+//     }), {
+//       status: 500,
+//       headers: {
+//         'Content-Type': 'application/json; charset=utf-8',
+//         'Access-Control-Allow-Origin': '*',
+//       },
+//     });
+//   }
+// }
+
+
+
+// // /api/chat/stream.js
+// export const config = { runtime: 'edge' };
+
+// export default async function handler(req) {
+//   // CORS preflight (optional)
+//   if (req.method === 'OPTIONS') {
+//     return new Response(null, {
+//       status: 204,
+//       headers: {
+//         'Access-Control-Allow-Origin': '*',
+//         'Access-Control-Allow-Methods': 'POST, OPTIONS',
+//         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+//       },
+//     });
+//   }
+
+//   try {
+//     const {
+//       messages = [],
+//       language = 'es',
+//       context = '',
+//     } = await req.json();
+
+//     // -------------------------------
+//     // 1) Compute user turns & CTA gate
+//     // -------------------------------
+//     const userTurns = messages.filter(m => m.role === 'user').length;
+//     // Show CTA only on the 3rd, 6th, 9th... user messages
+//     const SHOW_CTA = userTurns > 0 && userTurns % 3 === 0;
+
+//     const CTA_LINE =
+//       "Si tienes más preguntas o deseas agendar una cita con un especialista, no dudes en preguntar.";
+
+//     // -------------------------------
+//     // 2) Quick educational chips (always)
+//     // -------------------------------
+//     const EDUCATIONAL_CHIPS = [
+//       '[Beneficios]',
+//       '[Aplicaciones]',
+//       '[Proceso de recolección]',
+//       '[Pruebas genéticas]',
+//       '[Autorizaciones y calidad]',
+//       '[Preguntas frecuentes]',
+//     ];
+//     const QUICK_OPTIONS_STRING = EDUCATIONAL_CHIPS.join(' ');
+
+//     // -------------------------------
+//     // 3) Domain facts (safe, no precios)
+//     // -------------------------------
+//     const baseFacts = `
+// - Stem Care: primer y único banco privado de células madre de cordón umbilical en Guatemala (desde 2006).
+// - Procesamiento <24h; almacenamiento en 5 críoviales; fase de vapor de nitrógeno.
+// - Equipo con experiencia en recolección y trasplantes desde 2008.
+// - Autorizaciones MSPAS/DRACES y Colegio de Químicos Farmacéuticos; protocolos alineados a FDA/CBER.
+// - Cobertura 24/7 para recolección en Guatemala y El Salvador.
+// - Enfoque en educación, medicina regenerativa y pruebas genéticas (myNewborn, myPrenatal, myHealthScore).
+// `.trim();
+
+//     // -------------------------------
+//     // 4) System policy
+//     // -------------------------------
+//     const STRUCTURE_POLICY_ES = `
+// Eres un asistente virtual de Stem Care. Responde SIEMPRE en español, con precisión clínica y empatía.
+// Usa Markdown con títulos breves, listas y párrafos cortos.
+
+// Alcance:
+// - Criopreservación de sangre de cordón umbilical, aplicaciones terapéuticas, procesos clínicos, pruebas genéticas relacionadas y datos institucionales.
+// - NO des precios. Si preguntan costos, indica amablemente que se ven en una consulta informativa con el especialista.
+// - NO diagnostiques. Ofrece orientación general basada en evidencia y aclara límites.
+
+// Confianza:
+// - Cuando ayude, menciona credenciales verificables (2006, trasplantes desde 2008, autorizaciones locales, protocolos tipo FDA/CBER).
+// - Usa lenguaje prudente (“la evidencia sugiere…”, “en algunos casos…”).
+
+// Estructura recomendada:
+// 1) Resumen en 1–2 oraciones.
+// 2) Desarrollo educativo en viñetas o pasos.
+// 3) Cierre:
+//    - Si SHOW_CTA=true, añade EXACTAMENTE esta línea al final del texto (antes de las opciones rápidas):
+//      "${CTA_LINE}"
+//    - Si SHOW_CTA=false, NO incluyas ninguna invitación de contacto.
+// 4) Siempre termina con:
+// **Opciones rápidas:** ${QUICK_OPTIONS_STRING}
+
+// Reglas:
+// - No inventes chips fuera de los listados.
+// - Mantén un tono educativo y no comercial.
+
+// Marcado de intención (no visible para el usuario):
+// - Primera línea: <!--intent=educar|proceso|aplicaciones|pruebas|hablar_especialista|fuera_de_alcance-->
+
+// Contexto:
+// - Si hay "context", úsalo como prioridad cuando sea relevante. Ignora precios aunque aparezcan.
+
+// Datos base de respaldo:
+// ${baseFacts}
+// `.trim();
+
+//     const STRUCTURE_POLICY_EN = `
+// You are a virtual assistant for Stem Care. Default to Spanish unless asked. Never provide pricing.
+// Only append the CTA line every 3rd user turn when SHOW_CTA=true:
+// "${CTA_LINE}"
+// Always end with:
+// **Opciones rápidas:** ${QUICK_OPTIONS_STRING}
+// Start each reply with <!--intent=...-->.
+// `.trim();
+
+//     const system = language === 'es' ? STRUCTURE_POLICY_ES : STRUCTURE_POLICY_EN;
+
+//     // -------------------------------
+//     // 5) Build message stack
+//     // -------------------------------
+//     const sysMessages = [
+//       { role: 'system', content: system },
+//       { role: 'system', content: `SHOW_CTA=${SHOW_CTA}` }, // let the model know the gate
+//     ];
+
+//     if (typeof context === 'string' && context.trim()) {
+//       sysMessages.push({
+//         role: 'system',
+//         content:
+//           `Contexto de referencia (usar cuando sea relevante; omite precios si existieran):\n` +
+//           context.trim().slice(0, 7000),
+//       });
+//     }
+
+//     const body = {
+//       model: 'gpt-4o-mini',
+//       stream: true,
+//       messages: [...sysMessages, ...messages.slice(-12)],
+//     };
+
+//     // -------------------------------
+//     // 6) Stream from OpenAI
+//     // -------------------------------
+//     const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
+//       method: 'POST',
+//       headers: {
+//         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify(body),
+//     });
+
+//     if (!upstream.ok || !upstream.body) {
+//       const text = await upstream.text().catch(() => '');
+//       throw new Error(`Upstream error ${upstream.status}: ${text}`);
+//     }
+
+//     const reader = upstream.body.getReader();
+//     const encoder = new TextEncoder();
+//     const decoder = new TextDecoder();
+
+//     const stream = new ReadableStream({
+//       async start(controller) {
+//         let buffer = '';
+//         try {
+//           while (true) {
+//             const { value, done } = await reader.read();
+//             if (done) break;
+
+//             buffer += decoder.decode(value, { stream: true });
+//             const lines = buffer.split('\n');
+//             buffer = lines.pop() || '';
+
+//             for (const line of lines) {
+//               const s = line.trim();
+//               if (!s || !s.startsWith('data:')) continue;
+//               const data = s.slice(5).trim();
+//               if (data === '[DONE]') { controller.close(); return; }
+//               try {
+//                 const json = JSON.parse(data);
+//                 const token = json.choices?.[0]?.delta?.content || '';
+//                 if (token) controller.enqueue(encoder.encode(token));
+//               } catch { /* ignore partials */ }
+//             }
+//           }
+//         } catch (err) {
+//           controller.error(err);
+//         } finally {
+//           controller.close();
+//         }
+//       },
+//     });
+
+//     return new Response(stream, {
+//       status: 200,
+//       headers: {
+//         'Content-Type': 'text/plain; charset=utf-8',
+//         'Cache-Control': 'no-cache, no-transform',
+//         'Access-Control-Allow-Origin': '*',
+//       },
+//     });
+//   } catch (err) {
+//     return new Response(JSON.stringify({
+//       error: 'Error contacting assistant.',
+//       detail: err?.message || String(err),
+//     }), {
+//       status: 500,
+//       headers: {
+//         'Content-Type': 'application/json; charset=utf-8',
+//         'Access-Control-Allow-Origin': '*',
+//       },
+//     });
+//   }
+// }
+
+///////////////////////////////////////////////////////

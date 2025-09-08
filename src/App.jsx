@@ -232,44 +232,99 @@ const handleSubmit = async () => {
 
 
 
+  // const sendMessage = async (customInput) => {
+  //   const contentToSend = customInput || input
+  //   if (!contentToSend.trim()) return
+  //   const newMessages = [...messages, { role: 'user', content: contentToSend }]
+  //   setMessages(newMessages)
+  //   setInput('')
+  //   setLoading(true)
+
+  //   try {
+  //     const res = await fetch('/api/chat/stream', {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({ messages: newMessages, language: 'es' })
+  //     })
+
+  //     const reader = res.body.getReader()
+  //     const decoder = new TextDecoder('utf-8')
+  //     let fullText = ''
+
+  //     setMessages([...newMessages, { role: 'assistant', content: '' }])
+
+  //     while (true) {
+  //       const { value, done } = await reader.read()
+  //       if (done) break
+  //       const chunk = decoder.decode(value, { stream: true })
+  //       fullText += chunk
+  //       setMessages(prev => {
+  //         const updated = [...prev]
+  //         updated[updated.length - 1] = { role: 'assistant', content: fullText }
+  //         return updated
+  //       })
+  //     }
+  //   } catch (error) {
+  //     setMessages([...newMessages, { role: 'assistant', content: 'Error contacting assistant.' }])
+  //   }
+
+  //   setLoading(false)
+  // }
+
   const sendMessage = async (customInput) => {
-    const contentToSend = customInput || input
-    if (!contentToSend.trim()) return
-    const newMessages = [...messages, { role: 'user', content: contentToSend }]
-    setMessages(newMessages)
-    setInput('')
-    setLoading(true)
+  const contentToSend = customInput || input;
+  if (!contentToSend.trim()) return;
+  const newMessages = [...messages, { role: 'user', content: contentToSend }];
+  setMessages(newMessages);
+  setInput('');
+  setLoading(true);
 
-    try {
-      const res = await fetch('/api/chat/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages, language: 'es' })
-      })
+  try {
+    const res = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: newMessages, language: 'es' })
+    });
 
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder('utf-8')
-      let fullText = ''
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
 
-      setMessages([...newMessages, { role: 'assistant', content: '' }])
+    // 1) placeholder del asistente
+    setMessages([...newMessages, { role: 'assistant', content: '' }]);
 
-      while (true) {
-        const { value, done } = await reader.read()
-        if (done) break
-        const chunk = decoder.decode(value, { stream: true })
-        fullText += chunk
-        setMessages(prev => {
-          const updated = [...prev]
-          updated[updated.length - 1] = { role: 'assistant', content: fullText }
-          return updated
-        })
-      }
-    } catch (error) {
-      setMessages([...newMessages, { role: 'assistant', content: 'Error contacting assistant.' }])
+    // 2) buffer + flush temporizado
+    let fullText = '';
+    let buffer = '';
+    const FLUSH_EVERY_MS = 35; // ajusta a 30–45ms para “vibe ChatGPT”
+    const flush = () => {
+      if (!buffer) return;
+      fullText += buffer;
+      buffer = '';
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { role: 'assistant', content: fullText };
+        return updated;
+      });
+    };
+    const timer = setInterval(flush, FLUSH_EVERY_MS);
+
+    // 3) leer el stream y sólo llenar el buffer
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
     }
 
-    setLoading(false)
+    // 4) flush final
+    clearInterval(timer);
+    flush();
+  } catch (error) {
+    setMessages([...newMessages, { role: 'assistant', content: 'Error contacting assistant.' }]);
   }
+
+  setLoading(false);
+};
+
 
   const handleChipClick = (question) => {
     setInput(question)
