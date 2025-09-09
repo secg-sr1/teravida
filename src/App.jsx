@@ -549,7 +549,11 @@ const renderForm = () => {
             borderRadius:2, p:2,
           }}
         >
-          {messages.map((m,i)=>(
+          {messages.map((m,i)=>{
+            const prevRole = i > 0 ? messages[i - 1].role : null;
+            const mt = prevRole && prevRole !== m.role ? 4 : 2;
+
+            return (
             <Typography
               key={i}
               sx={{
@@ -571,7 +575,7 @@ const renderForm = () => {
                 fontWeight: m.role === 'user' ? 700 : 300,
                 whiteSpace: 'pre-line',
                 fontSize: bodyFontSize,
-                '& + &': { mt: 2 },            // spacing BETWEEN messages (single source of truth)
+                '& + &': { mt: 1 },            // spacing BETWEEN messages (single source of truth)
                 '& p, & ul, & ol': { m: 0 },   // kill inner margins
                 '& li': { m: 0 },
               }}
@@ -642,7 +646,7 @@ const renderForm = () => {
               {m.content}
             </ReactMarkdown>
             </Typography>
-          ))}
+          )})}
         </Box>
       </Collapse>
 
