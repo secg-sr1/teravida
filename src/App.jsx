@@ -51,15 +51,21 @@ const TF_FILLED_SX = {
   '& .MuiInputLabel-root': { fontFamily: 'Manrope' },
 };
 
+// const SECTION_TITLE_SX = {
+//   fontFamily: 'Manrope',
+//   fontSize: 10,
+//   letterSpacing: 1,
+//   fontWeight: 700,
+//   color: '#6b7a8c',
+//   mb: 1,
+//   mt: 2,
+//   textTransform: 'uppercase',
+// };
+
 const SECTION_TITLE_SX = {
-  fontFamily: 'Manrope',
-  fontSize: 10,
-  letterSpacing: 1,
-  fontWeight: 700,
-  color: '#6b7a8c',
-  mb: 1,
-  mt: 2,
-  textTransform: 'uppercase',
+  fontFamily:'Manrope', fontSize:10, letterSpacing:1, fontWeight:700, color:'#6b7a8c',
+  mb:1, mt:2, textTransform:'uppercase',
+  '&:first-of-type': { mt: 0 },   // no extra top gap on the first title
 };
 
 
@@ -338,7 +344,7 @@ const renderForm = () => {
     <Box sx={{ pt: 1 }}>
       {/* DATOS DE CONTACTO */}
       <Typography sx={SECTION_TITLE_SX}>Datos de contacto</Typography>
-      <Box component={Grid} container spacing={2}>
+      <Box component={Grid} container spacing={1.5}>
         <Grid item xs={12} md={4}>
           <TextField
             fullWidth variant="filled" label="Nombre"
@@ -378,7 +384,7 @@ const renderForm = () => {
 
       {/* INFORMACIÓN MÉDICA */}
       <Typography sx={SECTION_TITLE_SX}>Información médica</Typography>
-      <Box component={Grid} container spacing={2}>
+      <Box component={Grid} container spacing={1.5}>
         {isCrio && (
           <Grid item xs={12} md={4}>
             <TextField
@@ -507,88 +513,117 @@ const renderForm = () => {
 
       <Collapse in={hasConversation} timeout={300} unmountOnExit>
         <Box
+          // ref={scrollRef}
+          // sx={{
+          //   position: 'fixed',
+          //   bottom: messagesBottom,
+          //   left: '50%',
+          //   transform: 'translateX(-50%)',
+          //   px: 2,
+          //   maxHeight: isMobile ? '42vh' : '50vh',
+          //   overflowY: 'auto',
+          //   display: 'flex',
+          //   flexDirection: 'column',
+          //   width: '100%',
+          //   maxWidth: chatMaxWidth,
+          //   backdropFilter: 'blur(12px)',
+          //   backgroundColor: 'rgba(255,255,255,0.3)',
+          //   borderRadius: 2,
+          //   padding: 2,
+          // }}
           ref={scrollRef}
           sx={{
-            position: 'fixed',
-            bottom: messagesBottom,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            px: 2,
+            position:'fixed',
+            left:'50%',
+            transform:'translateX(-50%)',
+            bottom: (footerHeight + 6) + (isMobile ? 96 : 108), // ~dock height; adjust once
+            width:'100%', maxWidth: chatMaxWidth,
             maxHeight: isMobile ? '42vh' : '50vh',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            width: '100%',
-            maxWidth: chatMaxWidth,
-            backdropFilter: 'blur(12px)',
-            backgroundColor: 'rgba(255,255,255,0.3)',
-            borderRadius: 2,
-            padding: 2,
+            overflowY:'auto',
+            backdropFilter:'blur(12px)',
+            backgroundColor:'rgba(255,255,255,0.3)',
+            borderRadius:2, p:2,
           }}
         >
           {messages.map((m,i)=>(
             <Typography
               key={i}
               sx={{
-                mb: 1,
+                // mb: 1,
+                // color: m.role === 'user' ? '#000' : '#565457ff',
+                // fontFamily: 'Manrope',
+                // fontWeight: m.role === 'user' ? 700 : 300,
+                // textAlign: 'left',
+                // whiteSpace: 'pre-line',
+                // fontSize: bodyFontSize,
+                // '& h1, & h2, & h3': { fontWeight: 700, mt: 1.2, mb: 0.6 },
+                // '& p': { m: 0, mb: 1, lineHeight: 1.6, fontSize: bodyFontSize },
+                // '& ol, & ul': { pl: 3, mb: 1, lineHeight: 1.6, fontSize: bodyFontSize },
+                // '& li': { mb: 0.5 },
+                // '& strong': { fontWeight: 700 },
+                // '& a': { textDecoration: 'underline' }
                 color: m.role === 'user' ? '#000' : '#565457ff',
                 fontFamily: 'Manrope',
                 fontWeight: m.role === 'user' ? 700 : 300,
-                textAlign: 'left',
                 whiteSpace: 'pre-line',
                 fontSize: bodyFontSize,
-                '& h1, & h2, & h3': { fontWeight: 700, mt: 1.2, mb: 0.6 },
-                '& p': { m: 0, mb: 1, lineHeight: 1.6, fontSize: bodyFontSize },
-                '& ol, & ul': { pl: 3, mb: 1, lineHeight: 1.6, fontSize: bodyFontSize },
-                '& li': { mb: 0.5 },
-                '& strong': { fontWeight: 700 },
-                '& a': { textDecoration: 'underline' }
+                '& + &': { mt: 1 },            // spacing BETWEEN messages (single source of truth)
+                '& p, & ul, & ol': { m: 0 },   // kill inner margins
+                '& li': { m: 0 },
               }}
             >
             <ReactMarkdown
+              // remarkPlugins={[remarkGfm]}
+              // rehypePlugins={[rehypeRaw]}
+              // components={{
+              //   ol: ({node, ...props}) => (
+              //     <ol
+              //       style={{
+              //         paddingLeft: '1.5rem',
+              //         marginTop: 0,
+              //         marginBottom: '0.5rem', // margen reducido
+              //         lineHeight: 1.6
+              //       }}
+              //       {...props}
+              //     />
+              //   ),
+              //   ul: ({node, ...props}) => (
+              //     <ul
+              //       style={{
+              //         paddingLeft: '1.5rem',
+              //         marginTop: 0,
+              //         marginBottom: '0.5rem', // margen reducido
+              //         lineHeight: 1.6
+              //       }}
+              //       {...props}
+              //     />
+              //   ),
+              //   li: ({node, ...props}) => (
+              //     <li
+              //       style={{
+              //         marginBottom: '0.3rem', // menos espacio entre bullets
+              //       }}
+              //       {...props}
+              //     />
+              //   ),
+              //   p: ({node, ...props}) => (
+              //     <p
+              //       style={{
+              //         marginTop: 0,
+              //         marginBottom: '0.5rem', // margen compacto para párrafos
+              //       }}
+              //       {...props}
+              //     />
+              //   ),
+              //   strong: ({node, ...props}) => <strong {...props} />
+              // }}
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeRaw]}
               components={{
-                ol: ({node, ...props}) => (
-                  <ol
-                    style={{
-                      paddingLeft: '1.5rem',
-                      marginTop: 0,
-                      marginBottom: '0.5rem', // margen reducido
-                      lineHeight: 1.6
-                    }}
-                    {...props}
-                  />
-                ),
-                ul: ({node, ...props}) => (
-                  <ul
-                    style={{
-                      paddingLeft: '1.5rem',
-                      marginTop: 0,
-                      marginBottom: '0.5rem', // margen reducido
-                      lineHeight: 1.6
-                    }}
-                    {...props}
-                  />
-                ),
-                li: ({node, ...props}) => (
-                  <li
-                    style={{
-                      marginBottom: '0.3rem', // menos espacio entre bullets
-                    }}
-                    {...props}
-                  />
-                ),
-                p: ({node, ...props}) => (
-                  <p
-                    style={{
-                      marginTop: 0,
-                      marginBottom: '0.5rem', // margen compacto para párrafos
-                    }}
-                    {...props}
-                  />
-                ),
-                strong: ({node, ...props}) => <strong {...props} />
+                p:  (props)=><p style={{margin:0, lineHeight:1.6}} {...props}/>,
+                ul: (props)=><ul style={{margin:0, paddingLeft:'1.5rem', lineHeight:1.6}} {...props}/>,
+                ol: (props)=><ol style={{margin:0, paddingLeft:'1.5rem', lineHeight:1.6}} {...props}/>,
+                li: (props)=><li style={{margin:0}} {...props}/>,
               }}
             >
               {m.content}
@@ -598,7 +633,7 @@ const renderForm = () => {
         </Box>
       </Collapse>
 
-      <Box
+      {/* <Box
          sx={{
             position: 'fixed',
             bottom: chipsBottom,
@@ -667,7 +702,52 @@ const renderForm = () => {
             )
           }}
         />
+      </Box> */}
+
+      {/* Bottom dock (fixed once) */}
+      <Box
+        sx={{
+          position: 'fixed',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          bottom: footerHeight + 6,   // keep only footer offset
+          width: '100%',
+          maxWidth: promptMaxWidth,
+          px: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,                     // natural spacing between chips and prompt
+        }}
+      >
+        {/* Chips row (no absolute bottom) */}
+        <Box sx={{ display:'flex', flexWrap:'wrap', gap: isMobile ? 0.5 : 1, justifyContent:'center' }}>
+          {['Beneficios de células madre','Terapia Celular','Pruebas Genéticas'].map((q,i)=>(
+            <Chip key={i} size={isMobile ? 'small' : 'medium'} label={q} variant="outlined"
+                  onClick={() => handleChipClick(q)} sx={{ fontFamily: 'Manrope' }} />
+          ))}
+        </Box>
+
+        {/* Prompt box (no absolute bottom) */}
+        <Box sx={{ display:'flex', alignItems:'center', bgcolor:'#f0f0f0ff', borderRadius:'20px', px:2, py: isMobile ? 0.75 : 1 }}>
+          <TextField
+            fullWidth variant="standard" placeholder="Pregunta sobre células madre"
+            InputProps={{ disableUnderline:true, sx:{ ml:1, fontFamily:'Manrope', fontSize: isMobile ? 13 : 14 },
+              value: input, onChange:(e)=>setInput(e.target.value),
+              onKeyDown:(e)=> e.key==='Enter' && sendMessage(),
+              endAdornment:(
+                <InputAdornment position="end">
+                  <Tooltip title="Haz click para agendar tu consulta">
+                    <IconButton onClick={()=>setOpenDialog(true)} size={isMobile ? 'small' : 'medium'}>
+                      <AccountCircleIcon sx={{ color:'#535353ff' }} />
+                    </IconButton>
+                  </Tooltip>
+                </InputAdornment>
+              )
+            }}
+          />
+        </Box>
       </Box>
+
 
         <Dialog
           open={openDialog}
