@@ -572,7 +572,7 @@ const renderForm = () => {
                 fontWeight: m.role === 'user' ? 700 : 300,
                 whiteSpace: 'pre-line',
                 fontSize: bodyFontSize,
-                '& + &': { mt: 1.2 },            // spacing BETWEEN messages (single source of truth)
+                '& + &': { mt: 1.2, mb: 0.6 },            // spacing BETWEEN messages (single source of truth)
                 '& p, & ul, & ol': { m: 0 },   // kill inner margins
                 '& li': { m: 0 },
               }}
