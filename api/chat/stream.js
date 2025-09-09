@@ -26,7 +26,7 @@ export default async function handler(req) {
     const CTA_LINE = SHOW_CTA ? pickCta(ctaIdx) : '';
 
     // 2) Chips educativos siempre presentes
-    const QUICK_OPTIONS_STRING = chipsLine(EDU_CHIPS);
+    // const QUICK_OPTIONS_STRING = chipsLine(EDU_CHIPS);
 
     // 3) Datos base (seguros, sin precios)
     const baseFacts = `
@@ -43,7 +43,7 @@ export default async function handler(req) {
       language === 'es'
         ? SYSTEM_ES({
             showCta: SHOW_CTA,
-            chipsLine: QUICK_OPTIONS_STRING,
+            // chipsLine: QUICK_OPTIONS_STRING,
             baseFacts,
             ctaLine: CTA_LINE,
           })
