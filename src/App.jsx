@@ -623,11 +623,20 @@ const renderForm = () => {
               // }}
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeRaw]}
+              // components={{
+              //   p:  (props)=><p style={{margin:0, lineHeight:1.6}} {...props}/>,
+              //   ul: (props)=><ul style={{margin:0, paddingLeft:'1.5rem', lineHeight:1.6}} {...props}/>,
+              //   ol: (props)=><ol style={{margin:0, paddingLeft:'1.5rem', lineHeight:1.6}} {...props}/>,
+              //   li: (props)=><li style={{margin:0}} {...props}/>,
+              // }}
               components={{
-                p:  (props)=><p style={{margin:0, lineHeight:1.6}} {...props}/>,
-                ul: (props)=><ul style={{margin:0, paddingLeft:'1.5rem', lineHeight:1.6}} {...props}/>,
-                ol: (props)=><ol style={{margin:0, paddingLeft:'1.5rem', lineHeight:1.6}} {...props}/>,
-                li: (props)=><li style={{margin:0}} {...props}/>,
+                p:  (props) => <p style={{ margin: 0, lineHeight: 1.5 }} {...props} />,
+                ul: (props) => <ul style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: 1.5 }} {...props} />,
+                ol: (props) => <ol style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: 1.5 }} {...props} />,
+                li: (props) => <li style={{ margin: 0 }} {...props} />,
+                h1: (props) => <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }} {...props} />,
+                h2: (props) => <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }} {...props} />,
+                h3: (props) => <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }} {...props} />,
               }}
             >
               {m.content}
