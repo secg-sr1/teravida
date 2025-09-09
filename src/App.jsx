@@ -305,7 +305,7 @@ const handleSubmit = async () => {
     // 2) buffer + flush temporizado
     let fullText = '';
     let buffer = '';
-    const FLUSH_EVERY_MS = 35; // ajusta a 30–45ms para “vibe ChatGPT”
+    const FLUSH_EVERY_MS = 45; // ajusta a 30–45ms para “vibe ChatGPT”
     const flush = () => {
       if (!buffer) return;
       fullText += buffer;
