@@ -49,10 +49,16 @@ export default async function handler(req) {
           })
         : `You are Stem Care’s assistant. Default to Spanish unless explicitly asked for English.
 Never provide pricing. Do not diagnose. Start with <!--intent=...-->.
-End with "**Opciones rápidas:** ${QUICK_OPTIONS_STRING}".
-${SHOW_CTA ? `Add this exact CTA sentence before the quick options: "${CTA_LINE}"` : `Do not include any CTA sentence this turn.`}
 Facts:
 ${baseFacts}`;
+
+
+// `You are Stem Care’s assistant. Default to Spanish unless explicitly asked for English.
+// Never provide pricing. Do not diagnose. Start with <!--intent=...-->.
+// End with "**Opciones rápidas:** ${QUICK_OPTIONS_STRING}".
+// ${SHOW_CTA ? `Add this exact CTA sentence before the quick options: "${CTA_LINE}"` : `Do not include any CTA sentence this turn.`}
+// Facts:
+// ${baseFacts}`;
 
     // 5) Mensajes al modelo: system + bandera SHOW_CTA + context (si hay) + últimos turnos
     const sysMessages = [

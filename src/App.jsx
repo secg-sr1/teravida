@@ -277,6 +277,8 @@ const handleSubmit = async () => {
   //   setLoading(false)
   // }
 
+  ///// 
+
   const sendMessage = async (customInput) => {
   const contentToSend = customInput || input;
   if (!contentToSend.trim()) return;
