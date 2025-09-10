@@ -571,6 +571,8 @@ const renderForm = () => {
                 fontWeight: m.role === 'user' ? 700 : 300,
                 whiteSpace: 'pre-line',
                 fontSize: bodyFontSize,
+                '& h1, & h2, & h3': { fontWeight: 700, mt: 1, mb: 0.6 },
+                '& a': { textDecoration: 'underline' },
                 '& + &': { mt: 1 },            // spacing BETWEEN messages (single source of truth)
                 '& p, & ul, & ol': { m: 0 },   // kill inner margins
                 '& li': { m: 0 },
