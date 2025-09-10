@@ -337,7 +337,7 @@ const handleSubmit = async () => {
 
 
   const handleChipClick = (question) => {
-    setInput(question)
+    // setInput(question)
     sendMessage(question)
   }
 
