@@ -547,7 +547,6 @@ const renderForm = () => {
             backdropFilter:'blur(12px)',
             backgroundColor:'rgba(255,255,255,0.3)',
             borderRadius:2, p:2,
-            pt: 1
           }}
         >
           {messages.map((m,i)=>(
