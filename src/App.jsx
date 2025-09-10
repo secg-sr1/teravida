@@ -3,7 +3,6 @@
 
 /////////
 /////////////
-////
 import { Canvas, useFrame } from '@react-three/fiber'
 import { useRef, useState, useEffect } from 'react'
 import Membrane from './Membrane'
@@ -337,7 +336,7 @@ const handleSubmit = async () => {
 
 
   const handleChipClick = (question) => {
-    // setInput(question)
+    setInput(question)
     sendMessage(question)
   }
 

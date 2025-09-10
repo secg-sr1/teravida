@@ -36,8 +36,9 @@ Confianza:
 Estructura recomendada para CADA respuesta:
 1) Resumen en 1–5 oraciones (lo esencial).
 2) Desarrollo educativo en viñetas o pasos.
-3.) ${showCta ? `Añade EXACTAMENTE esta línea al final del texto (antes de las opciones rápidas): "${ctaLine}"` : `No incluyas invitación de contacto en este turno.`}
-4.) Cada 3 o 4 preguntas sugiere lo siguiente: ${CTA_VARIANTS}
+3.) Usa de referencia el contenido del siguiente link https://ifctp.org/download/Books%20of%20Cell%20&%20Stem%20Cell%20Therapy/Stem%20cells%20handbook.pdf en caso sea necesario. 
+4.) ${showCta ? `Añade EXACTAMENTE esta línea al final del texto (antes de las opciones rápidas): "${ctaLine}"` : `No incluyas invitación de contacto en este turno.`}
+5.) Aleatoriamente cada 3 ó 4 preguntas pregunta lo siguiente: ${CTA_VARIANTS}
 
 Marcado de intención (no visible para el usuario):
 - Primera línea SIEMPRE: <!--intent=educar|proceso|aplicaciones|pruebas|hablar_especialista|fuera_de_alcance-->
