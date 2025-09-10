@@ -236,50 +236,6 @@ const handleSubmit = async () => {
   }
 };
 
-
-
-
-  // const sendMessage = async (customInput) => {
-  //   const contentToSend = customInput || input
-  //   if (!contentToSend.trim()) return
-  //   const newMessages = [...messages, { role: 'user', content: contentToSend }]
-  //   setMessages(newMessages)
-  //   setInput('')
-  //   setLoading(true)
-
-  //   try {
-  //     const res = await fetch('/api/chat/stream', {
-  //       method: 'POST',
-  //       headers: { 'Content-Type': 'application/json' },
-  //       body: JSON.stringify({ messages: newMessages, language: 'es' })
-  //     })
-
-  //     const reader = res.body.getReader()
-  //     const decoder = new TextDecoder('utf-8')
-  //     let fullText = ''
-
-  //     setMessages([...newMessages, { role: 'assistant', content: '' }])
-
-  //     while (true) {
-  //       const { value, done } = await reader.read()
-  //       if (done) break
-  //       const chunk = decoder.decode(value, { stream: true })
-  //       fullText += chunk
-  //       setMessages(prev => {
-  //         const updated = [...prev]
-  //         updated[updated.length - 1] = { role: 'assistant', content: fullText }
-  //         return updated
-  //       })
-  //     }
-  //   } catch (error) {
-  //     setMessages([...newMessages, { role: 'assistant', content: 'Error contacting assistant.' }])
-  //   }
-
-  //   setLoading(false)
-  // }
-
-  ///// 
-
   const sendMessage = async (customInput) => {
   const contentToSend = customInput || input;
   if (!contentToSend.trim()) return;
@@ -516,24 +472,6 @@ const renderForm = () => {
 
       <Collapse in={hasConversation} timeout={300} unmountOnExit>
         <Box
-          // ref={scrollRef}
-          // sx={{
-          //   position: 'fixed',
-          //   bottom: messagesBottom,
-          //   left: '50%',
-          //   transform: 'translateX(-50%)',
-          //   px: 2,
-          //   maxHeight: isMobile ? '42vh' : '50vh',
-          //   overflowY: 'auto',
-          //   display: 'flex',
-          //   flexDirection: 'column',
-          //   width: '100%',
-          //   maxWidth: chatMaxWidth,
-          //   backdropFilter: 'blur(12px)',
-          //   backgroundColor: 'rgba(255,255,255,0.3)',
-          //   borderRadius: 2,
-          //   padding: 2,
-          // }}
           ref={scrollRef}
           sx={{
             position:'fixed',
@@ -548,173 +486,51 @@ const renderForm = () => {
             borderRadius:2, p:2,
           }}
         >
-          {messages.map((m,i)=>(
-            <Typography
-              key={i}
-              sx={{
-                // mb: 1,
-                // color: m.role === 'user' ? '#000' : '#565457ff',
-                // fontFamily: 'Manrope',
-                // fontWeight: m.role === 'user' ? 700 : 300,
-                // textAlign: 'left',
-                // whiteSpace: 'pre-line',
-                // fontSize: bodyFontSize,
-                // '& h1, & h2, & h3': { fontWeight: 700, mt: 1.2, mb: 0.6 },
-                // '& p': { m: 0, mb: 1, lineHeight: 1.6, fontSize: bodyFontSize },
-                // '& ol, & ul': { pl: 3, mb: 1, lineHeight: 1.6, fontSize: bodyFontSize },
-                // '& li': { mb: 0.5 },
-                // '& strong': { fontWeight: 700 },
-                // '& a': { textDecoration: 'underline' }
-                color: m.role === 'user' ? '#000' : '#565457ff',
-                fontFamily: 'Manrope',
-                fontWeight: m.role === 'user' ? 700 : 300,
-                whiteSpace: 'pre-line',
-                fontSize: bodyFontSize,
-                '& + &': { mt: 1 },            // spacing BETWEEN messages (single source of truth)
-                '& p, & ul, & ol': { m: 0 },   // kill inner margins
-                '& li': { m: 0 },
-              }}
-            >
-            <ReactMarkdown
-              // remarkPlugins={[remarkGfm]}
-              // rehypePlugins={[rehypeRaw]}
-              // components={{
-              //   ol: ({node, ...props}) => (
-              //     <ol
-              //       style={{
-              //         paddingLeft: '1.5rem',
-              //         marginTop: 0,
-              //         marginBottom: '0.5rem', // margen reducido
-              //         lineHeight: 1.6
-              //       }}
-              //       {...props}
-              //     />
-              //   ),
-              //   ul: ({node, ...props}) => (
-              //     <ul
-              //       style={{
-              //         paddingLeft: '1.5rem',
-              //         marginTop: 0,
-              //         marginBottom: '0.5rem', // margen reducido
-              //         lineHeight: 1.6
-              //       }}
-              //       {...props}
-              //     />
-              //   ),
-              //   li: ({node, ...props}) => (
-              //     <li
-              //       style={{
-              //         marginBottom: '0.3rem', // menos espacio entre bullets
-              //       }}
-              //       {...props}
-              //     />
-              //   ),
-              //   p: ({node, ...props}) => (
-              //     <p
-              //       style={{
-              //         marginTop: 0,
-              //         marginBottom: '0.5rem', // margen compacto para párrafos
-              //       }}
-              //       {...props}
-              //     />
-              //   ),
-              //   strong: ({node, ...props}) => <strong {...props} />
-              // }}
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeRaw]}
-              // components={{
-              //   p:  (props)=><p style={{margin:0, lineHeight:1.6}} {...props}/>,
-              //   ul: (props)=><ul style={{margin:0, paddingLeft:'1.5rem', lineHeight:1.6}} {...props}/>,
-              //   ol: (props)=><ol style={{margin:0, paddingLeft:'1.5rem', lineHeight:1.6}} {...props}/>,
-              //   li: (props)=><li style={{margin:0}} {...props}/>,
-              // }}
-              components={{
-                p:  (props) => <p style={{ margin: 0, lineHeight: 1.3 }} {...props} />,
-                ul: (props) => <ul style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: 1.3 }} {...props} />,
-                ol: (props) => <ol style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: 1.3 }} {...props} />,
-                li: (props) => <li style={{ margin: 0 }} {...props} />,
-                h1: (props) => <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }} {...props} />,
-                h2: (props) => <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }} {...props} />,
-                h3: (props) => <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }} {...props} />,
-              }}
-            >
-              {m.content}
-            </ReactMarkdown>
-            </Typography>
-          ))}
-        </Box>
-      </Collapse>
+          {messages.map((m, i) => {
+  const prevRole = i > 0 ? messages[i - 1].role : null;
+  // more space when role changes (user↔assistant)
+  const mt = i === 0 ? 0 : (prevRole && prevRole !== m.role ? 4 : 2); // 32px vs 16px
 
-      {/* <Box
-         sx={{
-            position: 'fixed',
-            bottom: chipsBottom,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            gap: isMobile ? 0.5 : 1,
-            flexWrap: 'wrap',
-            justifyContent: 'center',
-            maxWidth: chipsMaxWidth,
-            px: 2
-          }}
-      >
-        {['Beneficios de células madre','Terapia Celular','Pruebas Genéticas'].map((q,i)=>(
-          <Chip
-            key={i}
-            size={isMobile ? 'small' : 'medium'}
-            label={q}
-            variant="outlined"
-            onClick={() => handleChipClick(q)}
-            sx={{ fontFamily: 'Manrope' }}
-          />
-        ))}
-      </Box>
-
-
-
-
-      <Box
-        className="prompt-box"
-        sx={{
-              position: 'fixed',
-              bottom: promptBottom,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              bgcolor: '#f0f0f0ff',
-              borderRadius: '20px',
-              mx: 'auto',
-              maxWidth: promptMaxWidth,
-              width: '100%',
-              px: 2,
-              py: isMobile ? 0.75 : 1
+  return (
+    <Typography
+      key={i}
+      sx={{
+        mt,
+        color: m.role === 'user' ? '#000' : '#565457ff',
+        fontFamily: 'Manrope',
+        fontWeight: m.role === 'user' ? 700 : 300,
+        whiteSpace: 'pre-line',
+        fontSize: bodyFontSize,
+        '& p, & ul, & ol': { m: 0 },
+        '& li': { m: 0 },
+      }}
+    >
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
+        components={{
+          // tighter paragraphs + lists, but readable
+          p:  (props) => <p  style={{ margin: 0, lineHeight: 1.5 }} {...props} />,
+          ul: (props) => <ul style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: 1.5 }} {...props} />,
+          ol: (props) => <ol style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: 1.5 }} {...props} />,
+          li: (props) => <li style={{ margin: 0 }} {...props} />,
+          // headings without extra top/bottom gaps
+          h1: (props) => <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }} {...props} />,
+          h2: (props) => <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }} {...props} />,
+          h3: (props) => <h3 style={{ margin: 0, fontSize: '1rem',  fontWeight: 600 }} {...props} />,
+          // optional: style links a bit
+          a:  (props) => <a  style={{ textDecoration: 'underline' }} {...props} />,
+          strong: (props) => <strong {...props} />,
         }}
       >
-        <TextField
-          fullWidth
-          variant="standard"
-          placeholder="Pregunta sobre células madre"
-          InputProps={{
-            disableUnderline: true,
-            sx: { ml: 1, color: '#202020', fontFamily: 'Manrope', fontSize: isMobile ? 13 : 14 },
-            value: input,
-            onChange: (e) => setInput(e.target.value),
-            onKeyDown: (e) => e.key === 'Enter' && sendMessage(),
-            endAdornment: (
-              <InputAdornment position="end">
-                <Tooltip title="Haz click para agendar tu consulta">
-                  <IconButton onClick={() => setOpenDialog(true)} size={isMobile ? 'small' : 'medium'}>
-                    <AccountCircleIcon sx={{ color: '#535353ff' }} />
-                  </IconButton>
-                </Tooltip>
-              </InputAdornment>
-            )
-          }}
-        />
-      </Box> */}
+        {m.content}
+      </ReactMarkdown>
+    </Typography>
+  );
+})}
+
+        </Box>
+      </Collapse>
 
       {/* Bottom dock (fixed once) */}
       <Box
