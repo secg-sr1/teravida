@@ -489,7 +489,7 @@ const renderForm = () => {
           {messages.map((m, i) => {
   const prevRole = i > 0 ? messages[i - 1].role : null;
   // more space when role changes (user↔assistant)
-  const mt = i === 0 ? 0 : (prevRole && prevRole !== m.role ? 4 : 2); // 32px vs 16px
+  const mt = i === 0 ? 0 : (prevRole && prevRole !== m.role ? 2 : 1); // 32px vs 16px
 
   return (
     <Typography
