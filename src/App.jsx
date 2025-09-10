@@ -547,13 +547,10 @@ const renderForm = () => {
             backdropFilter:'blur(12px)',
             backgroundColor:'rgba(255,255,255,0.3)',
             borderRadius:2, p:2,
+            pt: 1
           }}
         >
-          {messages.map((m,i)=>{
-            const prevRole = i > 0 ? messages[i - 1].role : null;
-            const mt = prevRole && prevRole !== m.role ? 4 : 2;
-
-            return (
+          {messages.map((m,i)=>(
             <Typography
               key={i}
               sx={{
@@ -634,9 +631,9 @@ const renderForm = () => {
               //   li: (props)=><li style={{margin:0}} {...props}/>,
               // }}
               components={{
-                p:  (props) => <p style={{ margin: 0, lineHeight: 1.5 }} {...props} />,
-                ul: (props) => <ul style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: 1.5 }} {...props} />,
-                ol: (props) => <ol style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: 1.5 }} {...props} />,
+                p:  (props) => <p style={{ margin: 0, lineHeight: 1.3 }} {...props} />,
+                ul: (props) => <ul style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: 1.3 }} {...props} />,
+                ol: (props) => <ol style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: 1.3 }} {...props} />,
                 li: (props) => <li style={{ margin: 0 }} {...props} />,
                 h1: (props) => <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }} {...props} />,
                 h2: (props) => <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }} {...props} />,
@@ -646,7 +643,7 @@ const renderForm = () => {
               {m.content}
             </ReactMarkdown>
             </Typography>
-          )})}
+          ))}
         </Box>
       </Collapse>
 
