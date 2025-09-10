@@ -571,8 +571,6 @@ const renderForm = () => {
                 fontWeight: m.role === 'user' ? 700 : 300,
                 whiteSpace: 'pre-line',
                 fontSize: bodyFontSize,
-                '& h1, & h2, & h3': { fontWeight: 700, mt: 1, mb: 0.6 },
-                '& a': { textDecoration: 'underline' },
                 '& + &': { mt: 1 },            // spacing BETWEEN messages (single source of truth)
                 '& p, & ul, & ol': { m: 0 },   // kill inner margins
                 '& li': { m: 0 },
@@ -743,7 +741,7 @@ const renderForm = () => {
         </Box>
 
         {/* Prompt box (no absolute bottom) */}
-        <Box sx={{ display:'flex', alignItems:'center', bgcolor:'#f0f0f0ff', borderRadius:'20px', px:2, py: isMobile ? 0.75 : 1 }}>
+        <Box sx={{ display:'flex', alignItems:'center', bgcolor:'#f0f0f0ff', borderRadius:'20px', px:2, py: isMobile ? 0.75 : 1.5 }}>
           <TextField
             fullWidth variant="standard" placeholder="Pregunta sobre células madre"
             InputProps={{ disableUnderline:true, sx:{ ml:1, fontFamily:'Manrope', fontSize: isMobile ? 13 : 14 },
