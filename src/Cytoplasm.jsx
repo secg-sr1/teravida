@@ -3,7 +3,7 @@ import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-export default function Cytoplasm() {
+export default function Cytoplasm({ isAIResponding = false }) {
   const ref = useRef()
   const count = 800
 
@@ -24,7 +24,19 @@ export default function Cytoplasm() {
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
-    if (ref.current) ref.current.rotation.y = t * 0.04
+    if (ref.current) {
+      // Enhanced rotation during AI response
+      const rotationSpeed = isAIResponding ? 0.08 : 0.04
+      ref.current.rotation.y = t * rotationSpeed
+      
+      // Add slight scaling during AI response
+      if (isAIResponding) {
+        const scale = 1 + Math.sin(t * 1.5) * 0.02
+        ref.current.scale.set(scale, scale, scale)
+      } else {
+        ref.current.scale.set(1, 1, 1)
+      }
+    }
   })
 
   return (

@@ -3,7 +3,7 @@ import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-export default function Nucleus() {
+export default function Nucleus({ isAIResponding = false }) {
   const ref = useRef()
   const count = 1200
 
@@ -24,8 +24,15 @@ export default function Nucleus() {
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
-    ref.current.rotation.y = t * 0.15
-    const scale = 1 + Math.sin(t * 2) * 0.03
+    
+    // Enhanced rotation during AI response
+    const rotationSpeed = isAIResponding ? 0.25 : 0.15
+    ref.current.rotation.y = t * rotationSpeed
+    
+    // More dynamic scaling during AI response
+    const scaleIntensity = isAIResponding ? 0.05 : 0.03
+    const scaleSpeed = isAIResponding ? 3 : 2
+    const scale = 1 + Math.sin(t * scaleSpeed) * scaleIntensity
     ref.current.scale.set(scale, scale, scale)
   })
 

@@ -3,7 +3,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-export default function Membrane() {
+export default function Membrane({ isAIResponding = false }) {
   const meshRef = useRef()
   const basePositions = useRef([])
 
@@ -11,8 +11,14 @@ export default function Membrane() {
     const t = clock.getElapsedTime()
     if (!meshRef.current) return
 
-    meshRef.current.rotation.y = t * 0.1
-    const scale = 1 + Math.sin(t * 1.5) * 0.02
+    // Enhanced rotation during AI response
+    const rotationSpeed = isAIResponding ? 0.2 : 0.1
+    meshRef.current.rotation.y = t * rotationSpeed
+    
+    // More pronounced scaling during AI response
+    const scaleIntensity = isAIResponding ? 0.04 : 0.02
+    const scaleSpeed = isAIResponding ? 2.5 : 1.5
+    const scale = 1 + Math.sin(t * scaleSpeed) * scaleIntensity
     meshRef.current.scale.set(scale, scale, scale)
 
     const geom = meshRef.current.geometry
@@ -27,7 +33,11 @@ export default function Membrane() {
       const x = basePositions.current[i3]
       const y = basePositions.current[i3 + 1]
       const z = basePositions.current[i3 + 2]
-      const offset = Math.sin(t * 2 + x * 3 + y * 3 + z * 3) * 0.02
+      
+      // Enhanced vertex animation during AI response
+      const waveSpeed = isAIResponding ? 3 : 2
+      const waveIntensity = isAIResponding ? 0.03 : 0.02
+      const offset = Math.sin(t * waveSpeed + x * 3 + y * 3 + z * 3) * waveIntensity
       positions.setXYZ(i, x + x * offset, y + y * offset, z + z * offset)
     }
     positions.needsUpdate = true
