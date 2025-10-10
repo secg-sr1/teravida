@@ -12,7 +12,6 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@html2canvas/html2canvas": "^1.6.3",
     "@mui/icons-material": "^7.2.0",
     "@mui/material": "^7.2.0",
     "@react-three/drei": "^10.6.1",
@@ -21,6 +20,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "html2canvas": "^1.4.1",
     "node-fetch": "^3.3.2",
     "openai": "^5.12.2",
     "react": "^19.1.0",
