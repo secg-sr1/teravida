@@ -27,17 +27,11 @@ import EditCalendarIcon from '@mui/icons-material/EditCalendar';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import FileCopyIcon from '@mui/icons-material/FileCopy';
 import DownloadForOfflineIcon from '@mui/icons-material/DownloadForOffline';
-import ShareIcon from '@mui/icons-material/Share';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import InstagramIcon from '@mui/icons-material/Instagram';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import LanguageIcon from '@mui/icons-material/Language';
 import DownloadIcon from '@mui/icons-material/Download';
-import HistoryIcon from '@mui/icons-material/History';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import TouchAppIcon from '@mui/icons-material/TouchApp';
 import VideoCallIcon from '@mui/icons-material/VideoCall';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
@@ -58,7 +52,6 @@ import Collapse from '@mui/material/Collapse';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import html2canvas from 'html2canvas';
 
 
 
@@ -196,36 +189,63 @@ const TABS = {
   GENETICAS: 2,
 };
 
-// Field configs for each tab
-const FIELD_SETS = {
-  [TABS.CRIO]: [
-    { name: 'nombre',  label: 'Nombre',               required: true },
-    { name: 'apellidos', label: 'Apellidos' },
-    { name: 'email',   label: 'E-mail',              required: true, type: 'email' },
-    { name: 'telefono', label: 'Teléfono' },
-    { name: 'semana_de_embarazo', label: 'Semana de embarazo', type: 'number' },
-    { name: 'nombre_de_ginecologo', label: 'Nombre de Ginecólogo' },
-    { name: 'telefonos_de_contacto', label: 'Teléfonos de contacto' },
-  ],
+// Field configs for each tab - function to support multiple languages
+const getFieldSets = (lang = 'es') => {
+  const labels = {
+    es: {
+      nombre: 'Nombre',
+      apellidos: 'Apellidos',
+      email: 'E-mail',
+      telefono: 'Teléfono',
+      semana_de_embarazo: 'Semana de embarazo',
+      nombre_de_ginecologo: 'Nombre de Ginecólogo',
+      telefonos_de_contacto: 'Teléfonos de contacto',
+      mensaje: 'Mensaje'
+    },
+    en: {
+      nombre: 'Name',
+      apellidos: 'Last Name',
+      email: 'E-mail',
+      telefono: 'Phone',
+      semana_de_embarazo: 'Pregnancy Week',
+      nombre_de_ginecologo: 'Gynecologist Name',
+      telefonos_de_contacto: 'Contact Phones',
+      mensaje: 'Message'
+    }
+  };
 
-  [TABS.TERAPIA]: [
-    { name: 'nombre',  label: 'Nombre',               required: true },
-    { name: 'apellidos', label: 'Apellidos' },
-    { name: 'email',   label: 'E-mail',              required: true, type: 'email' },
-    { name: 'telefono', label: 'Teléfono' },
-    { name: 'telefonos_de_contacto', label: 'Teléfonos de contacto' },
-    { name: 'mensaje', label: 'Mensaje', type: 'textarea' },
-  ],
+  const l = labels[lang] || labels.es;
 
-  // Pruebas genéticas = same as terapia
-  [TABS.GENETICAS]: [
-    { name: 'nombre',  label: 'Nombre',               required: true },
-    { name: 'apellidos', label: 'Apellidos' },
-    { name: 'email',   label: 'E-mail',              required: true, type: 'email' },
-    { name: 'telefono', label: 'Teléfono' },
-    { name: 'telefonos_de_contacto', label: 'Teléfonos de contacto' },
-    { name: 'mensaje', label: 'Mensaje', type: 'textarea' },
-  ],
+  return {
+    [TABS.CRIO]: [
+      { name: 'nombre',  label: l.nombre,               required: true },
+      { name: 'apellidos', label: l.apellidos },
+      { name: 'email',   label: l.email,              required: true, type: 'email' },
+      { name: 'telefono', label: l.telefono },
+      { name: 'semana_de_embarazo', label: l.semana_de_embarazo, type: 'number' },
+      { name: 'nombre_de_ginecologo', label: l.nombre_de_ginecologo },
+      { name: 'telefonos_de_contacto', label: l.telefonos_de_contacto },
+    ],
+
+    [TABS.TERAPIA]: [
+      { name: 'nombre',  label: l.nombre,               required: true },
+      { name: 'apellidos', label: l.apellidos },
+      { name: 'email',   label: l.email,              required: true, type: 'email' },
+      { name: 'telefono', label: l.telefono },
+      { name: 'telefonos_de_contacto', label: l.telefonos_de_contacto },
+      { name: 'mensaje', label: l.mensaje, type: 'textarea' },
+    ],
+
+    // Pruebas genéticas = same as terapia
+    [TABS.GENETICAS]: [
+      { name: 'nombre',  label: l.nombre,               required: true },
+      { name: 'apellidos', label: l.apellidos },
+      { name: 'email',   label: l.email,              required: true, type: 'email' },
+      { name: 'telefono', label: l.telefono },
+      { name: 'telefonos_de_contacto', label: l.telefonos_de_contacto },
+      { name: 'mensaje', label: l.mensaje, type: 'textarea' },
+    ],
+  };
 };
 
 
@@ -303,10 +323,14 @@ export default function App() {
 
 const handleSubmit = async () => {
   // 1) Validate only required fields for the current tab
+  const FIELD_SETS = getFieldSets(currentLanguage);
   const required = FIELD_SETS[activeTab].filter(f => f.required).map(f => f.name);
   const missing = required.filter(k => !String(formData[k] ?? '').trim());
   if (missing.length) {
-    alert(`Faltan campos: ${missing.join(', ')}`);
+    alert(currentLanguage === 'es' 
+      ? `Faltan campos: ${missing.join(', ')}` 
+      : `Missing fields: ${missing.join(', ')}`
+    );
     return;
   }
 
@@ -346,15 +370,16 @@ const handleSubmit = async () => {
     // Call your email function (Resend)
     await sendContact(payload, origen);
 
-    alert('Formulario enviado con éxito');
+    alert(currentLanguage === 'es' ? 'Formulario enviado con éxito' : 'Form submitted successfully');
     setOpenDialog(false);
     // optional: clear only the fields for the current tab
+    const FIELD_SETS_CLEAR = getFieldSets(currentLanguage);
     const cleared = { ...formData };
-    FIELD_SETS[activeTab].forEach(f => { cleared[f.name] = '' });
+    FIELD_SETS_CLEAR[activeTab].forEach(f => { cleared[f.name] = '' });
     setFormData(cleared);
   } catch (err) {
     console.error(err);
-    alert('Error al enviar el formulario');
+    alert(currentLanguage === 'es' ? 'Error al enviar el formulario' : 'Error submitting form');
   }
 };
 
@@ -465,7 +490,7 @@ const handleSubmit = async () => {
 
       const exportConversation = () => {
         const conversationText = messages.map(msg => 
-          `${msg.role === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}`
+          `${msg.role === 'user' ? (currentLanguage === 'es' ? 'Usuario' : 'User') : (currentLanguage === 'es' ? 'Asistente' : 'Assistant')}: ${msg.content}`
         ).join('\n\n');
         
         const blob = new Blob([conversationText], { type: 'text/plain' });
@@ -479,7 +504,7 @@ const handleSubmit = async () => {
 
       const copyConversation = async () => {
         const conversationText = messages.map(msg => 
-          `${msg.role === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}`
+          `${msg.role === 'user' ? (currentLanguage === 'es' ? 'Usuario' : 'User') : (currentLanguage === 'es' ? 'Asistente' : 'Assistant')}: ${msg.content}`
         ).join('\n\n');
         
         try {
@@ -497,6 +522,9 @@ const handleSubmit = async () => {
 
   const changeLanguage = (lang) => {
     setCurrentLanguage(lang);
+    // Clear conversation when changing language to avoid mixed language context
+    setConversationHistory([]);
+    setUserQuestionCount(0);
   };
 
   // Copy message content to clipboard
@@ -518,7 +546,9 @@ const handleSubmit = async () => {
       minute: '2-digit'
     });
     
-    const messageText = `Stem Care - Mensaje del Asistente\nFecha: ${date}\nHora: ${time}\n\n${content}`;
+    const messageText = currentLanguage === 'es' 
+      ? `Stem Care - Mensaje del Asistente\nFecha: ${date}\nHora: ${time}\n\n${content}`
+      : `Stem Care - Assistant Message\nDate: ${date}\nTime: ${time}\n\n${content}`;
     
     const blob = new Blob([messageText], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -529,435 +559,6 @@ const handleSubmit = async () => {
     URL.revokeObjectURL(url);
   };
 
-  // Share message to social media
-  const shareMessage = (content, platform, shareType = 'text') => {
-    if (shareType === 'screenshot') {
-      shareAsScreenshot(content, platform);
-      return;
-    }
-
-    const shareText = `Información sobre células madre de Stem Care:\n\n${content}\n\n#StemCare #CélulasMadre #MedicinaRegenerativa`;
-    const encodedText = encodeURIComponent(shareText);
-    const stemCareUrl = 'https://stem-care.com';
-    const encodedUrl = encodeURIComponent(stemCareUrl);
-    
-    let shareUrl = '';
-    
-    switch (platform) {
-      case 'facebook':
-        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`;
-        break;
-      case 'whatsapp':
-        shareUrl = `https://wa.me/?text=${encodedText}%20${encodedUrl}`;
-        break;
-      case 'instagram':
-        // Instagram doesn't support direct URL sharing, so we'll copy to clipboard
-        navigator.clipboard.writeText(shareText).then(() => {
-          alert(currentLanguage === 'es' 
-            ? 'Texto copiado al portapapeles. Pégalo en tu historia de Instagram.' 
-            : 'Text copied to clipboard. Paste it in your Instagram story.'
-          );
-        });
-        return;
-      default:
-        return;
-    }
-    
-    // Open share URL in new window
-    window.open(shareUrl, '_blank', 'width=600,height=400');
-  };
-
-  // Share as screenshot
-  const shareAsScreenshot = async (content, platform) => {
-    try {
-      console.log('Attempting to capture screenshot for content:', content.substring(0, 100));
-      
-      // Find the message element to capture - look for the entire message box
-      const messageBoxes = document.querySelectorAll('[data-message-box]');
-      console.log('Found message boxes:', messageBoxes.length);
-      
-      let targetElement = null;
-      
-      // Find the element that contains our content
-      for (let element of messageBoxes) {
-        console.log('Checking element with content:', element.textContent.substring(0, 100));
-        // Try multiple content matching strategies
-        const contentMatch = element.textContent.includes(content.substring(0, 50)) ||
-                           element.textContent.includes(content.substring(0, 30)) ||
-                           element.textContent.includes(content.substring(0, 20)) ||
-                           element.getAttribute('data-message-box') === content;
-        
-        if (contentMatch) {
-          targetElement = element;
-          console.log('Found matching element!');
-          break;
-        }
-      }
-      
-      if (!targetElement) {
-        // Fallback: try to find any message container with specific styling
-        console.log('Primary search failed, trying fallback...');
-        const allBoxes = document.querySelectorAll('.MuiBox-root');
-        console.log('Found MUI boxes:', allBoxes.length);
-        
-        for (let element of allBoxes) {
-          const hasContent = element.textContent.includes(content.substring(0, 50)) ||
-                           element.textContent.includes(content.substring(0, 30)) ||
-                           element.textContent.includes(content.substring(0, 20));
-          const hasStyling = element.style.backgroundColor || element.style.borderRadius || 
-                           element.getAttribute('sx') || element.className.includes('MuiBox');
-          
-          console.log('Checking fallback element:', {
-            hasContent,
-            hasStyling,
-            content: element.textContent.substring(0, 50)
-          });
-          
-          if (hasContent && hasStyling) {
-            targetElement = element;
-            console.log('Found fallback element!');
-            break;
-          }
-        }
-      }
-      
-      if (!targetElement) {
-        // Last resort: try to find any element with the content
-        console.log('Fallback failed, trying last resort...');
-        const allElements = document.querySelectorAll('*');
-        for (let element of allElements) {
-          if (element.textContent && element.textContent.includes(content.substring(0, 50))) {
-            // Make sure it's a reasonable size element
-            const rect = element.getBoundingClientRect();
-            if (rect.width > 100 && rect.height > 50) {
-              targetElement = element;
-              console.log('Found last resort element!');
-              break;
-            }
-          }
-        }
-      }
-      
-      if (!targetElement) {
-        // Final fallback: capture the most recent assistant message
-        console.log('All searches failed, trying to find the most recent assistant message...');
-        
-        // Look for the last message box that contains assistant content
-        const allMessageBoxes = document.querySelectorAll('[data-message-box]');
-        let lastAssistantMessage = null;
-        
-        for (let i = allMessageBoxes.length - 1; i >= 0; i--) {
-          const element = allMessageBoxes[i];
-          // Check if this looks like an assistant message (not user message)
-          const text = element.textContent;
-          if (text && text.length > 50 && !text.includes('Usuario:') && !text.includes('User:')) {
-            lastAssistantMessage = element;
-            console.log('Found last assistant message as fallback');
-            break;
-          }
-        }
-        
-        if (lastAssistantMessage) {
-          targetElement = lastAssistantMessage;
-        } else {
-          // Ultimate fallback: capture the entire conversation area
-          console.log('No assistant message found, trying conversation area...');
-          const conversationArea = document.querySelector('[ref]') || 
-                                  document.querySelector('.MuiBox-root[style*="position: fixed"]') ||
-                                  document.querySelector('div[style*="overflowY"]');
-          
-          if (conversationArea) {
-            targetElement = conversationArea;
-            console.log('Using conversation area as ultimate fallback');
-          } else {
-            console.error('Could not find any element to capture');
-            alert(currentLanguage === 'es' 
-              ? 'No se pudo encontrar el mensaje para capturar. Intenta con un mensaje más reciente.' 
-              : 'Could not find message to capture. Try with a more recent message.'
-            );
-            return;
-          }
-        }
-      }
-      
-      console.log('Target element found:', targetElement);
-
-      // Use html2canvas to capture the element
-      const canvas = await html2canvas(targetElement, {
-        backgroundColor: darkMode ? '#1a1a1a' : '#ffffff',
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        width: targetElement.offsetWidth,
-        height: targetElement.offsetHeight,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: targetElement.offsetWidth,
-        windowHeight: targetElement.offsetHeight
-      });
-
-      // Show preview modal
-      showScreenshotPreview(canvas, content, platform);
-      
-    } catch (error) {
-      console.error('Screenshot error:', error);
-      alert(currentLanguage === 'es' 
-        ? 'Error al capturar la imagen' 
-        : 'Error capturing image'
-      );
-    }
-  };
-
-  // Show screenshot preview modal
-  const showScreenshotPreview = (canvas, content, platform) => {
-    // Create preview modal
-    const previewModal = document.createElement('div');
-    previewModal.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.8);
-      z-index: 10001;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Manrope', sans-serif;
-    `;
-
-    const previewContent = document.createElement('div');
-    previewContent.style.cssText = `
-      background: ${darkMode ? '#2a2a2a' : '#ffffff'};
-      border-radius: 12px;
-      padding: 20px;
-      max-width: 90%;
-      max-height: 90%;
-      overflow: auto;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-      border: 1px solid ${darkMode ? '#444' : '#ddd'};
-    `;
-
-    const title = document.createElement('div');
-    title.textContent = currentLanguage === 'es' ? 'Vista previa de la imagen' : 'Image Preview';
-    title.style.cssText = `
-      font-weight: 600;
-      margin-bottom: 16px;
-      color: ${darkMode ? '#ffffff' : '#000000'};
-      font-size: 18px;
-      text-align: center;
-    `;
-
-    const imageContainer = document.createElement('div');
-    imageContainer.style.cssText = `
-      text-align: center;
-      margin-bottom: 20px;
-      border: 1px solid ${darkMode ? '#444' : '#ddd'};
-      border-radius: 8px;
-      padding: 10px;
-      background: ${darkMode ? '#1a1a1a' : '#f9f9f9'};
-    `;
-
-    const img = document.createElement('img');
-    img.src = canvas.toDataURL('image/png');
-    img.style.cssText = `
-      max-width: 100%;
-      max-height: 400px;
-      border-radius: 4px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    `;
-
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.cssText = `
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
-    `;
-
-    const shareButton = document.createElement('button');
-    shareButton.textContent = currentLanguage === 'es' ? 'Compartir' : 'Share';
-    shareButton.style.cssText = `
-      padding: 12px 24px;
-      background: ${platform === 'facebook' ? '#1877F2' : 
-                   platform === 'whatsapp' ? '#25D366' : '#E4405F'};
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-family: 'Manrope', sans-serif;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    `;
-
-    const downloadButton = document.createElement('button');
-    downloadButton.textContent = currentLanguage === 'es' ? 'Descargar' : 'Download';
-    downloadButton.style.cssText = `
-      padding: 12px 24px;
-      background: #7d7da8;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-family: 'Manrope', sans-serif;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    `;
-
-    const cancelButton = document.createElement('button');
-    cancelButton.textContent = currentLanguage === 'es' ? 'Cancelar' : 'Cancel';
-    cancelButton.style.cssText = `
-      padding: 12px 24px;
-      background: transparent;
-      color: ${darkMode ? '#ffffff' : '#000000'};
-      border: 1px solid ${darkMode ? '#444' : '#ddd'};
-      border-radius: 8px;
-      font-family: 'Manrope', sans-serif;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    `;
-
-    // Event handlers
-    shareButton.onclick = () => {
-      document.body.removeChild(previewModal);
-      shareScreenshotImage(canvas, content, platform);
-    };
-
-    downloadButton.onclick = () => {
-      const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'stem-care-mensaje.png';
-      a.click();
-    };
-
-    cancelButton.onclick = () => {
-      document.body.removeChild(previewModal);
-    };
-
-    // Hover effects
-    [shareButton, downloadButton, cancelButton].forEach(btn => {
-      btn.onmouseover = () => {
-        btn.style.transform = 'translateY(-1px)';
-        btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-      };
-      btn.onmouseout = () => {
-        btn.style.transform = 'translateY(0)';
-        btn.style.boxShadow = 'none';
-      };
-    });
-
-    // Assemble modal
-    imageContainer.appendChild(img);
-    buttonContainer.appendChild(shareButton);
-    buttonContainer.appendChild(downloadButton);
-    buttonContainer.appendChild(cancelButton);
-    
-    previewContent.appendChild(title);
-    previewContent.appendChild(imageContainer);
-    previewContent.appendChild(buttonContainer);
-    previewModal.appendChild(previewContent);
-    
-    document.body.appendChild(previewModal);
-
-    // Close on outside click
-    previewModal.onclick = (e) => {
-      if (e.target === previewModal) {
-        document.body.removeChild(previewModal);
-      }
-    };
-  };
-
-  // Share the screenshot image
-  const shareScreenshotImage = async (canvas, content, platform) => {
-    try {
-      // Convert canvas to blob
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          alert(currentLanguage === 'es' 
-            ? 'Error al generar la imagen' 
-            : 'Error generating image'
-          );
-          return;
-        }
-
-        // Create share text
-        const shareText = `Información sobre células madre de Stem Care\n\n#StemCare #CélulasMadre #MedicinaRegenerativa`;
-        
-        if (platform === 'instagram') {
-          // For Instagram, we'll download the image and copy text
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'stem-care-mensaje.png';
-          a.click();
-          URL.revokeObjectURL(url);
-          
-          navigator.clipboard.writeText(shareText).then(() => {
-            alert(currentLanguage === 'es' 
-              ? 'Imagen descargada y texto copiado. Sube la imagen a Instagram con el texto copiado.' 
-              : 'Image downloaded and text copied. Upload the image to Instagram with the copied text.'
-            );
-          });
-        } else {
-          // For other platforms, we'll use the Web Share API if available
-          if (navigator.share && navigator.canShare) {
-            const file = new File([blob], 'stem-care-mensaje.png', { type: 'image/png' });
-            
-            if (navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                title: 'Stem Care - Información sobre células madre',
-                text: shareText,
-                files: [file]
-              });
-            } else {
-              // Fallback: download image and copy text
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = 'stem-care-mensaje.png';
-              a.click();
-              URL.revokeObjectURL(url);
-              
-              navigator.clipboard.writeText(shareText).then(() => {
-                alert(currentLanguage === 'es' 
-                  ? 'Imagen descargada y texto copiado. Comparte la imagen con el texto copiado.' 
-                  : 'Image downloaded and text copied. Share the image with the copied text.'
-                );
-              });
-            }
-          } else {
-            // Fallback for browsers without Web Share API
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'stem-care-mensaje.png';
-            a.click();
-            URL.revokeObjectURL(url);
-            
-            navigator.clipboard.writeText(shareText).then(() => {
-              alert(currentLanguage === 'es' 
-                ? 'Imagen descargada y texto copiado. Comparte la imagen con el texto copiado.' 
-                : 'Image downloaded and text copied. Share the image with the copied text.'
-              );
-            });
-          }
-        }
-      }, 'image/png');
-      
-    } catch (error) {
-      console.error('Share screenshot error:', error);
-      alert(currentLanguage === 'es' 
-        ? 'Error al compartir la imagen' 
-        : 'Error sharing image'
-      );
-    }
-  };
 
   // Check if we should show meeting drawer (every 3 questions)
   const shouldShowMeetingDrawer = () => {
@@ -995,33 +596,59 @@ const handleSubmit = async () => {
           icon: <MenuBookIcon />,
           name: currentLanguage === 'es' ? 'Glosario médico' : 'Medical glossary',
           action: () => setGlossaryOpen(true)
-        },
-        {
-          icon: <TouchAppIcon />,
-          name: currentLanguage === 'es' ? 'Modo interactivo' : 'Interactive mode',
-          action: () => setInteractiveMode(!interactiveMode)
-        },
-        {
-          icon: <HistoryIcon />,
-          name: currentLanguage === 'es' ? 'Historial de conversaciones' : 'Conversation history',
-          action: () => {
-            // Future implementation for conversation history
-            alert(currentLanguage === 'es' ? 'Próximamente: Historial de conversaciones' : 'Coming soon: Conversation history');
-          }
         }
       ];
 
 const renderForm = () => {
   const isCrio = activeTab === TABS.CRIO;
+  const t = {
+    es: {
+      contactData: 'Datos de contacto',
+      medicalInfo: 'Información médica',
+      message: 'Mensaje',
+      nombre: 'Nombre',
+      apellidos: 'Apellidos',
+      email: 'E-mail',
+      telefono: 'Teléfono',
+      telefonoPlaceholder: '+502 5555 5555',
+      telefonoHelper: 'Sólo números o +; ej: +502 5555 5555',
+      semanaEmbarazo: 'Semana de Embarazo',
+      nombreGinecologo: 'Nombre de Doctor/Especialista',
+      telefonosContacto: 'Teléfonos de Contacto',
+      telefonosHelper: 'Opcional — separa con comas si son varios',
+      hospital: 'Hospital en donde se Atenderá',
+      opcional: 'Opcional',
+      mensaje: 'Mensaje'
+    },
+    en: {
+      contactData: 'Contact Data',
+      medicalInfo: 'Medical Information',
+      message: 'Message',
+      nombre: 'Name',
+      apellidos: 'Last Name',
+      email: 'E-mail',
+      telefono: 'Phone',
+      telefonoPlaceholder: '+502 5555 5555',
+      telefonoHelper: 'Only numbers or +; e.g.: +502 5555 5555',
+      semanaEmbarazo: 'Pregnancy Week',
+      nombreGinecologo: 'Doctor/Specialist Name',
+      telefonosContacto: 'Contact Phones',
+      telefonosHelper: 'Optional — separate with commas if multiple',
+      hospital: 'Hospital Where You Will Be Attended',
+      opcional: 'Optional',
+      mensaje: 'Message'
+    }
+  };
+  const lang = t[currentLanguage] || t.es;
 
   return (
     <Box sx={{ pt: 1 }}>
       {/* DATOS DE CONTACTO */}
-      <Typography sx={SECTION_TITLE_SX(darkMode)}>Datos de contacto</Typography>
+      <Typography sx={SECTION_TITLE_SX(darkMode)}>{lang.contactData}</Typography>
       <Box component={Grid} container spacing={1.5}>
         <Grid item xs={12} md={4}>
           <TextField
-            fullWidth variant="filled" label="Nombre"
+            fullWidth variant="filled" label={lang.nombre}
             required value={formData.nombre || ''}
             onChange={(e)=>setFormData(p=>({...p,nombre:e.target.value}))}
             sx={TF_FILLED_SX(darkMode)}
@@ -1029,7 +656,7 @@ const renderForm = () => {
         </Grid>
         <Grid item xs={12} md={4}>
           <TextField
-            fullWidth variant="filled" label="Apellidos"
+            fullWidth variant="filled" label={lang.apellidos}
             value={formData.apellidos || ''}
             onChange={(e)=>setFormData(p=>({...p,apellidos:e.target.value}))}
             sx={TF_FILLED_SX(darkMode)}
@@ -1037,7 +664,7 @@ const renderForm = () => {
         </Grid>
         <Grid item xs={12} md={4}>
           <TextField
-            fullWidth variant="filled" label="E-mail" type="email"
+            fullWidth variant="filled" label={lang.email} type="email"
             required value={formData.email || ''}
             onChange={(e)=>setFormData(p=>({...p,email:e.target.value}))}
             sx={TF_FILLED_SX(darkMode)}
@@ -1046,46 +673,46 @@ const renderForm = () => {
 
         <Grid item xs={12} md={4}>
           <TextField
-            fullWidth variant="filled" label="Teléfono"
-            placeholder="+502 5555 5555"
+            fullWidth variant="filled" label={lang.telefono}
+            placeholder={lang.telefonoPlaceholder}
             value={formData.telefono || ''}
             onChange={(e)=>setFormData(p=>({...p,telefono:e.target.value}))}
-            helperText="Sólo números o +; ej: +502 5555 5555"
+            helperText={lang.telefonoHelper}
             sx={TF_FILLED_SX(darkMode)}
           />
         </Grid>
       </Box>
 
       {/* INFORMACIÓN MÉDICA */}
-      <Typography sx={SECTION_TITLE_SX(darkMode)}>Información médica</Typography>
+      <Typography sx={SECTION_TITLE_SX(darkMode)}>{lang.medicalInfo}</Typography>
       <Box component={Grid} container spacing={1.5}>
         {isCrio && (
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth variant="filled" type="number"
-              label="Semana de Embarazo"
+              label={lang.semanaEmbarazo}
               value={formData.semana_de_embarazo || ''}
               onChange={(e)=>setFormData(p=>({...p,semana_de_embarazo:e.target.value}))}
-              helperText="Opcional"
+              helperText={lang.opcional}
               sx={TF_FILLED_SX(darkMode)}
             />
           </Grid>
         )}
         <Grid item xs={12} md={4}>
           <TextField
-            fullWidth variant="filled" label="Nombre de Ginecólogo"
+            fullWidth variant="filled" label={lang.nombreGinecologo}
             value={formData.nombre_de_ginecologo || ''}
             onChange={(e)=>setFormData(p=>({...p,nombre_de_ginecologo:e.target.value}))}
-            helperText="Opcional"
+            helperText={lang.opcional}
             sx={TF_FILLED_SX(darkMode)}
           />
         </Grid>
         <Grid item xs={12} md={4}>
           <TextField
-            fullWidth variant="filled" label="Teléfonos de Contacto"
+            fullWidth variant="filled" label={lang.telefonosContacto}
             value={formData.telefonos_de_contacto || ''}
             onChange={(e)=>setFormData(p=>({...p,telefonos_de_contacto:e.target.value}))}
-            helperText="Opcional — separa con comas si son varios"
+            helperText={lang.telefonosHelper}
             sx={TF_FILLED_SX(darkMode)}
           />
         </Grid>
@@ -1094,10 +721,10 @@ const renderForm = () => {
         {isCrio && (
           <Grid item xs={12} md={4}>
             <TextField
-              fullWidth variant="filled" label="Hospital en donde se Atenderá"
+              fullWidth variant="filled" label={lang.hospital}
               value={formData.hospital_donde_se_atendera || ''}
               onChange={(e)=>setFormData(p=>({...p,hospital_donde_se_atendera:e.target.value}))}
-              helperText="Opcional"
+              helperText={lang.opcional}
               sx={TF_FILLED_SX(darkMode)}
             />
           </Grid>
@@ -1105,13 +732,13 @@ const renderForm = () => {
       </Box>
 
       {/* MENSAJE */}
-      <Typography sx={SECTION_TITLE_SX(darkMode)}>Mensaje</Typography>
+      <Typography sx={SECTION_TITLE_SX(darkMode)}>{lang.message}</Typography>
       <TextField
-        fullWidth variant="filled" label="Mensaje"
+        fullWidth variant="filled" label={lang.mensaje}
         multiline minRows={5}
         value={formData.mensaje || ''}
         onChange={(e)=>setFormData(p=>({...p,mensaje:e.target.value}))}
-        sx={TF_FILLED_SX}
+        sx={TF_FILLED_SX(darkMode)}
       />
     </Box>
   );
@@ -1285,7 +912,10 @@ const renderForm = () => {
           height: footerHeight,
           zIndex:1
         }}>
-          © 2025 Supervisado por el Departamento de Investigacion & Desarrollo en Stem Care. |  Comprueba la información importante ó contáctanos.
+          {currentLanguage === 'es' 
+            ? '© 2025 Supervisado por el Departamento de Investigación & Desarrollo en Stem Care. | Comprueba la información importante ó contáctanos.'
+            : '© 2025 Supervised by the Research & Development Department at Stem Care. | Verify important information or contact us.'
+          }
 </footer>
 
 
@@ -1711,230 +1341,6 @@ const renderForm = () => {
                 </IconButton>
               </Tooltip>
 
-              <Tooltip title={currentLanguage === 'es' ? 'Compartir en redes sociales' : 'Share on social media'}>
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    // Create a styled dropdown menu for social platforms
-                    const menu = document.createElement('div');
-                    menu.style.cssText = `
-                      position: fixed;
-                      top: 50%;
-                      left: 50%;
-                      transform: translate(-50%, -50%);
-                      background: ${darkMode ? '#2a2a2a' : '#ffffff'};
-                      border: 1px solid ${darkMode ? '#444' : '#ddd'};
-                      border-radius: 12px;
-                      padding: 20px;
-                      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-                      z-index: 10000;
-                      font-family: 'Manrope', sans-serif;
-                      min-width: 200px;
-                    `;
-                    
-                    const title = document.createElement('div');
-                    title.textContent = currentLanguage === 'es' ? 'Compartir en:' : 'Share on:';
-                    title.style.cssText = `
-                      font-family: 'Manrope', sans-serif;
-                      font-weight: 600;
-                      margin-bottom: 12px;
-                      color: ${darkMode ? '#ffffff' : '#000000'};
-                      font-size: 16px;
-                      text-align: center;
-                    `;
-                    menu.appendChild(title);
-
-                    // Add share type selector
-                    const shareTypeContainer = document.createElement('div');
-                    shareTypeContainer.style.cssText = `
-                      display: flex;
-                      gap: 8px;
-                      margin-bottom: 16px;
-                      justify-content: center;
-                    `;
-
-                    const textButton = document.createElement('button');
-                    textButton.textContent = currentLanguage === 'es' ? 'Texto' : 'Text';
-                    textButton.style.cssText = `
-                      padding: 6px 12px;
-                      border: 1px solid ${darkMode ? '#444' : '#ddd'};
-                      border-radius: 6px;
-                      background: ${darkMode ? '#333' : '#f5f5f5'};
-                      color: ${darkMode ? '#ffffff' : '#000000'};
-                      font-family: 'Manrope', sans-serif;
-                      font-size: 12px;
-                      cursor: pointer;
-                      transition: all 0.2s ease;
-                    `;
-
-                    const screenshotButton = document.createElement('button');
-                    screenshotButton.textContent = currentLanguage === 'es' ? 'Imagen' : 'Image';
-                    screenshotButton.style.cssText = `
-                      padding: 6px 12px;
-                      border: 1px solid ${darkMode ? '#444' : '#ddd'};
-                      border-radius: 6px;
-                      background: transparent;
-                      color: ${darkMode ? '#ffffff' : '#000000'};
-                      font-family: 'Manrope', sans-serif;
-                      font-size: 12px;
-                      cursor: pointer;
-                      transition: all 0.2s ease;
-                    `;
-
-                    let selectedShareType = 'text';
-
-                    textButton.onclick = () => {
-                      selectedShareType = 'text';
-                      textButton.style.background = darkMode ? '#333' : '#f5f5f5';
-                      screenshotButton.style.background = 'transparent';
-                    };
-
-                    screenshotButton.onclick = () => {
-                      selectedShareType = 'screenshot';
-                      screenshotButton.style.background = darkMode ? '#333' : '#f5f5f5';
-                      textButton.style.background = 'transparent';
-                    };
-
-                    shareTypeContainer.appendChild(textButton);
-                    shareTypeContainer.appendChild(screenshotButton);
-                    menu.appendChild(shareTypeContainer);
-                    
-                    const platforms = [
-                      { 
-                        name: 'Facebook', 
-                        key: 'facebook', 
-                        color: '#1877F2',
-                        icon: 'M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z'
-                      },
-                      { 
-                        name: 'WhatsApp', 
-                        key: 'whatsapp', 
-                        color: '#25D366',
-                        icon: 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488'
-                      },
-                      { 
-                        name: 'Instagram', 
-                        key: 'instagram', 
-                        color: '#E4405F',
-                        icon: 'M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z'
-                      }
-                    ];
-                    
-                    platforms.forEach(platform => {
-                      const button = document.createElement('button');
-                      button.style.cssText = `
-                        display: flex;
-                        align-items: center;
-                        width: 100%;
-                        padding: 12px 16px;
-                        margin: 6px 0;
-                        background: ${platform.color};
-                        color: white;
-                        border: none;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        font-family: 'Manrope', sans-serif;
-                        font-size: 14px;
-                        font-weight: 500;
-                        transition: all 0.2s ease;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                      `;
-                      
-                      // Create SVG icon
-                      const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                      iconSvg.setAttribute('width', '20');
-                      iconSvg.setAttribute('height', '20');
-                      iconSvg.setAttribute('viewBox', '0 0 24 24');
-                      iconSvg.setAttribute('fill', 'currentColor');
-                      iconSvg.style.marginRight = '12px';
-                      
-                      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                      path.setAttribute('d', platform.icon);
-                      iconSvg.appendChild(path);
-                      
-                      const text = document.createElement('span');
-                      text.textContent = platform.name;
-                      
-                      button.appendChild(iconSvg);
-                      button.appendChild(text);
-                      
-                      button.onmouseover = () => {
-                        button.style.transform = 'translateY(-1px)';
-                        button.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-                      };
-                      button.onmouseout = () => {
-                        button.style.transform = 'translateY(0)';
-                        button.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                      };
-                      button.onclick = () => {
-                        shareMessage(m.content, platform.key, selectedShareType);
-                        document.body.removeChild(overlay);
-                        document.body.removeChild(menu);
-                      };
-                      menu.appendChild(button);
-                    });
-                    
-                    const closeButton = document.createElement('button');
-                    closeButton.textContent = currentLanguage === 'es' ? 'Cerrar' : 'Close';
-                    closeButton.style.cssText = `
-                      display: block;
-                      width: 100%;
-                      padding: 8px 16px;
-                      margin-top: 12px;
-                      background: transparent;
-                      color: ${darkMode ? '#ffffff' : '#000000'};
-                      border: 1px solid ${darkMode ? '#444' : '#ddd'};
-                      border-radius: 8px;
-                      cursor: pointer;
-                      font-family: 'Manrope', sans-serif;
-                      font-size: 13px;
-                      font-weight: 500;
-                      transition: all 0.2s ease;
-                    `;
-                    closeButton.onmouseover = () => {
-                      closeButton.style.backgroundColor = darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                    };
-                    closeButton.onmouseout = () => {
-                      closeButton.style.backgroundColor = 'transparent';
-                    };
-                    closeButton.onclick = () => {
-                      document.body.removeChild(overlay);
-                      document.body.removeChild(menu);
-                    };
-                    menu.appendChild(closeButton);
-                    
-                    document.body.appendChild(menu);
-                    
-                    // Close menu when clicking outside
-                    const overlay = document.createElement('div');
-                    overlay.style.cssText = `
-                      position: fixed;
-                      top: 0;
-                      left: 0;
-                      width: 100%;
-                      height: 100%;
-                      background: rgba(0,0,0,0.4);
-                      z-index: 9999;
-                      backdrop-filter: blur(2px);
-                    `;
-                    overlay.onclick = () => {
-                      document.body.removeChild(overlay);
-                      document.body.removeChild(menu);
-                    };
-                    document.body.appendChild(overlay);
-                  }}
-                  sx={{
-                    padding: '3px',
-                    color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)',
-                    '&:hover': {
-                      color: darkMode ? '#ffffff' : '#000000',
-                      backgroundColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
-                    }
-                  }}
-                >
-                  <ShareIcon sx={{ fontSize: '1.1rem' }} />
-                </IconButton>
-              </Tooltip>
             </Box>
           )}
         </Box>
@@ -1954,21 +1360,21 @@ const renderForm = () => {
             fontStyle: 'italic'
           }}
         >
-          El asistente está escribiendo
+          {currentLanguage === 'es' ? 'El asistente está escribiendo' : 'Assistant is typing'}
         </Typography>
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
+        <Box sx={{ display: 'flex', gap: 0.35 }}>
           {[0, 1, 2].map((i) => (
             <Box
               key={i}
               sx={{
-                width: 6,
-                height: 6,
+                width: 4,
+                height: 4,
                 borderRadius: '50%',
                 backgroundColor: darkMode ? '#cccccc' : '#565457ff',
                 animation: `typing 1.4s infinite ease-in-out ${i * 0.2}s`,
                 '@keyframes typing': {
                   '0%, 60%, 100%': { transform: 'translateY(0)' },
-                  '30%': { transform: 'translateY(-10px)' }
+                  '30%': { transform: 'translateY(-8px)' }
                 }
               }}
             />
@@ -2015,9 +1421,9 @@ const renderForm = () => {
           left: '50%',
           transform: 'translateX(-50%)',
           bottom: footerHeight + 6,   // keep only footer offset
-          width: '100%',
+          width: isMobile ? '95%' : '100%',
           maxWidth: promptMaxWidth,
-          px: 2,
+          px: isMobile ? 1 : 2,
           display: 'flex',
           flexDirection: 'column',
           gap: 1,                     // natural spacing between chips and prompt
@@ -2025,7 +1431,10 @@ const renderForm = () => {
       >
         {/* Chips row (no absolute bottom) */}
         <Box sx={{ display:'flex', flexWrap:'wrap', gap: isMobile ? 0.5 : 1, justifyContent:'center' }}>
-          {['Beneficios de células madre','Terapia Celular','Pruebas Genéticas'].map((q,i)=>(
+          {(currentLanguage === 'es' 
+            ? ['Beneficios de células madre','Terapia Celular','Pruebas Genéticas']
+            : ['Stem Cell Benefits','Cell Therapy','Genetic Testing']
+          ).map((q,i)=>(
                 <Chip 
                   key={i} 
                   size={isMobile ? 'small' : 'medium'} 
@@ -2053,7 +1462,7 @@ const renderForm = () => {
               alignItems:'center', 
               bgcolor: darkMode ? 'rgba(255,255,255,0.1)' : '#f0f0f0ff', 
               borderRadius:'20px', 
-              px:2, 
+              px: isMobile ? 0.5 : 2, 
               py: isMobile ? 0.75 : 1.5,
               border: darkMode ? '1px solid rgba(255,255,255,0.2)' : 'none',
               transition: 'all 0.3s ease-in-out',
@@ -2068,6 +1477,7 @@ const renderForm = () => {
               sx:{
                 fontFamily:'Manrope', 
                 fontSize: isMobile ? 13 : 14,
+                px: isMobile ? 1 : 0,
                 color: darkMode ? '#ffffff' : '#000000',
                 '&::placeholder': {
                   color: darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)'
@@ -2111,7 +1521,9 @@ const renderForm = () => {
 
 
       
-        <DialogTitle sx={{fontFamily: 'Manrope', color: darkMode ? '#ffffff' : '#000000'}}>Agendar Consulta</DialogTitle>
+        <DialogTitle sx={{fontFamily: 'Manrope', color: darkMode ? '#ffffff' : '#000000'}}>
+          {currentLanguage === 'es' ? 'Agendar Consulta' : 'Schedule Consultation'}
+        </DialogTitle>
         <Tabs
           value={activeTab}
           onChange={(e, v) => setActiveTab(v)}
@@ -2124,7 +1536,7 @@ const renderForm = () => {
               color: '#7d7da8',
             },
             '& .Mui-selected': {
-              color: darkMode ? '#FFFFF' : '#7d7da8',
+              color: darkMode ? '#FFFFFF' : '#7d7da8',
             },
             '& .MuiTabs-indicator': {
               backgroundColor: '#7d7da8',
@@ -2132,9 +1544,9 @@ const renderForm = () => {
           }}
         >
 
-          <Tab label="Criopreservación" sx={{fontFamily: 'Manrope,', fontWeight:500 }} />
-          <Tab label="Terapia Celular" sx={{fontFamily: 'Manrope', fontWeight:500}}/>
-          <Tab label="Pruebas Genéticas" sx={{fontFamily: 'Manrope', fontWeight:500}} />
+          <Tab label={currentLanguage === 'es' ? "Criopreservación" : "Cryopreservation"} sx={{fontFamily: 'Manrope,', fontWeight:500 }} />
+          <Tab label={currentLanguage === 'es' ? "Terapia Celular" : "Cell Therapy"} sx={{fontFamily: 'Manrope', fontWeight:500}}/>
+          <Tab label={currentLanguage === 'es' ? "Pruebas Genéticas" : "Genetic Testing"} sx={{fontFamily: 'Manrope', fontWeight:500}} />
         </Tabs>
 
         {/* <DialogContent sx={{fontFamily: 'Manrope'}}  >
@@ -2165,7 +1577,7 @@ const renderForm = () => {
               }
             }}
           >
-            Cancelar
+            {currentLanguage === 'es' ? 'Cancelar' : 'Cancel'}
           </Button>
           <Button 
             variant="contained" 
@@ -2179,7 +1591,7 @@ const renderForm = () => {
               }
             }}
           >
-            Enviar
+            {currentLanguage === 'es' ? 'Enviar' : 'Send'}
           </Button>
         </DialogActions>
       </Dialog>
