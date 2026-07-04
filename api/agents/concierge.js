@@ -10,6 +10,10 @@ import { Buffer } from 'node:buffer';
 import { setCorsHeaders } from '../_cors.mjs';
 import { runConciergeStream } from '../../lib/agent/run.mjs';
 import { createSession } from '../../lib/agent/memory.mjs';
+import { rateLimit, clientIp } from '../../lib/agent/ratelimit.mjs';
+
+const RATE_LIMIT = 15; // requests
+const RATE_WINDOW = 60; // seconds
 
 async function readJson(req) {
   if (req.body && typeof req.body === 'object') return req.body;
@@ -29,6 +33,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (!(await rateLimit(`concierge:${clientIp(req)}`, RATE_LIMIT, RATE_WINDOW))) {
+      setCorsHeaders(req, res);
+      return res.status(429).json({ error: 'Too many requests, please slow down.' });
+    }
+
     const { message, language = 'es', sessionId } = await readJson(req);
     if (!message || !String(message).trim()) {
       return res.status(400).json({ error: 'message is required' });

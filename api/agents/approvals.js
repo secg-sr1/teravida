@@ -14,6 +14,10 @@ import { Buffer } from 'node:buffer';
 import process from 'node:process';
 import { setCorsHeaders } from '../_cors.mjs';
 import { listPending, decide } from '../../lib/agent/approvals.mjs';
+import { rateLimit, clientIp } from '../../lib/agent/ratelimit.mjs';
+
+const RATE_LIMIT = 30; // requests
+const RATE_WINDOW = 60; // seconds
 
 async function readJson(req) {
   if (req.body && typeof req.body === 'object') return req.body;
@@ -38,6 +42,10 @@ export default async function handler(req, res) {
 
   if (!authorized(req)) return res.status(401).json({ error: 'Unauthorized' });
 
+  if (!(await rateLimit(`approvals:${clientIp(req)}`, RATE_LIMIT, RATE_WINDOW))) {
+    return res.status(429).json({ error: 'Too many requests, please slow down.' });
+  }
+
   try {
     if (req.method === 'GET') {
       const sessionId =
@@ -47,11 +55,14 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { approvalId, decision, decidedBy } = await readJson(req);
-      if (!approvalId || !['approve', 'reject'].includes(decision)) {
-        return res.status(400).json({ error: 'approvalId and decision (approve|reject) required' });
+      const { approvalId, decision, decidedBy, sessionId } = await readJson(req);
+      if (!approvalId || !['approve', 'reject'].includes(decision) || !sessionId) {
+        return res
+          .status(400)
+          .json({ error: 'approvalId, decision (approve|reject) and sessionId are required' });
       }
-      const result = await decide(approvalId, decision, decidedBy || 'human');
+      const result = await decide(approvalId, decision, decidedBy || 'human', sessionId);
+      if (result.status === 'forbidden') return res.status(403).json(result);
       return res.status(200).json(result);
     }
 

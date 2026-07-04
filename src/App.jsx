@@ -547,7 +547,7 @@ const handleSubmit = async () => {
       const res = await fetch('/api/agents/approvals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ approvalId, decision }),
+        body: JSON.stringify({ approvalId, decision, sessionId: agentSessionRef.current }),
       });
       const j = await res.json().catch(() => ({}));
       setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
