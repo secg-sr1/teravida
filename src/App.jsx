@@ -9,11 +9,10 @@ import Membrane from './Membrane'
 import Nucleus from './NucleusMesh'
 import Cytoplasm from './Cytoplasm'
 import MedicalGlossary from './MedicalGlossary'
-import InteractiveCell from './InteractiveCell'
 import GlowRing from './GlowRing'
 import * as THREE from 'three'
 import './App.css'
-import { Environment } from '@react-three/drei'
+import { Environment, OrbitControls, AdaptiveDpr } from '@react-three/drei'
 import { EffectComposer, Bloom, DepthOfField } from '@react-three/postprocessing'
 import TextField from '@mui/material/TextField'
 import Box from '@mui/material/Box'
@@ -43,7 +42,7 @@ import {
   Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button, Tabs, Tab, Grid,
   Switch, FormControlLabel, Select, MenuItem, FormControl, InputLabel, Drawer, List,
   ListItem, ListItemIcon, ListItemText, Divider, Card, CardContent, SpeedDial,
-  SpeedDialAction, SpeedDialIcon
+  SpeedDialAction, SpeedDialIcon, Snackbar, Alert
 } from '@mui/material'
 
 import Collapse from '@mui/material/Collapse';
@@ -112,48 +111,59 @@ const SECTION_TITLE_SX = (darkMode) => ({
 });
 
 
-function AutoOrbitCamera({ isAIResponding = false }) {
-  const ref = useRef({
-    radius: 5,
-    targetRadius: 5,
-    rotationSpeed: 0.2,
-    targetRotationSpeed: 0.2,
-    verticalOffset: 0,
-    targetVerticalOffset: 0
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(
+    () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  )
+
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+    if (!mq) return
+    const onChange = (e) => setReduced(e.matches)
+    mq.addEventListener?.('change', onChange)
+    return () => mq.removeEventListener?.('change', onChange)
+  }, [])
+
+  return reduced
+}
+
+// Auto-orbits like before, but the user can grab, rotate and zoom the cell.
+// Auto-rotation pauses while they interact and resumes after a few seconds idle.
+function CellCameraRig({ isAIResponding = false, reducedMotion = false }) {
+  const controlsRef = useRef()
+  const idleTimer = useRef(null)
+  const [userActive, setUserActive] = useState(false)
+
+  useEffect(() => () => clearTimeout(idleTimer.current), [])
+
+  useFrame((_, delta) => {
+    const controls = controlsRef.current
+    if (!controls) return
+    // autoRotateSpeed 2 ≈ one orbit every 30s (matches the previous pace); faster while the AI responds
+    const target = isAIResponding ? 4 : 2
+    controls.autoRotateSpeed += (target - controls.autoRotateSpeed) * Math.min(1, delta * 2)
   })
-  
-  useFrame(({ camera, clock }) => {
-    const t = clock.getElapsedTime()
-    
-    // Smooth transition between normal and AI response modes
-    const targetRadius = isAIResponding ? 6.5 : 5
-    const targetRotationSpeed = isAIResponding ? 0.4 : 0.2
-    const targetVerticalOffset = isAIResponding ? 0.5 : 0
-    
-    // Smooth interpolation for all parameters
-    const lerpSpeed = 0.03
-    ref.current.targetRadius = targetRadius
-    ref.current.targetRotationSpeed = targetRotationSpeed
-    ref.current.targetVerticalOffset = targetVerticalOffset
-    
-    ref.current.radius += (ref.current.targetRadius - ref.current.radius) * lerpSpeed
-    ref.current.rotationSpeed += (ref.current.targetRotationSpeed - ref.current.rotationSpeed) * lerpSpeed
-    ref.current.verticalOffset += (ref.current.targetVerticalOffset - ref.current.verticalOffset) * lerpSpeed
-    
-    // Smooth camera position with easing
-    const angle = t * ref.current.rotationSpeed
-    const radius = ref.current.radius
-    
-    camera.position.x = Math.sin(angle) * radius
-    camera.position.z = Math.cos(angle) * radius
-    
-    // Smooth vertical movement
-    camera.position.y = Math.sin(t * 0.3) * ref.current.verticalOffset
-    
-    camera.lookAt(0, 0, 0)
-  })
-  
-  return null
+
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      enablePan={false}
+      enableDamping
+      dampingFactor={0.08}
+      minDistance={3}
+      maxDistance={8}
+      autoRotate={!reducedMotion && !userActive}
+      regress
+      onStart={() => {
+        clearTimeout(idleTimer.current)
+        setUserActive(true)
+      }}
+      onEnd={() => {
+        clearTimeout(idleTimer.current)
+        idleTimer.current = setTimeout(() => setUserActive(false), 4000)
+      }}
+    />
+  )
 }
 
 function DynamicDepthOfField({ isAIResponding = false }) {
@@ -251,24 +261,28 @@ const getFieldSets = (lang = 'es') => {
 
 
 export default function App() {
-  const [prompt, setPrompt] = useState('')
-  const [messages, setMessages] = useState([])
+  const [messages, setMessages] = useState(() => {
+    // Survive a page refresh within the same browser session
+    try {
+      const saved = sessionStorage.getItem('teravida-chat')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [typing, setTyping] = useState(false)
-  const [darkMode, setDarkMode] = useState(false)
-  const [conversationHistory, setConversationHistory] = useState([])
-  const [currentLanguage, setCurrentLanguage] = useState('es')
+  const [darkMode, setDarkMode] = useState(() => {
+    try { return localStorage.getItem('teravida-dark-mode') === '1' } catch { return false }
+  })
+  const [currentLanguage, setCurrentLanguage] = useState(() => {
+    try { return localStorage.getItem('teravida-language') || 'es' } catch { return 'es' }
+  })
   const [glossaryOpen, setGlossaryOpen] = useState(false)
-  const [interactiveMode, setInteractiveMode] = useState(false)
   const [meetingDrawerOpen, setMeetingDrawerOpen] = useState(false)
   const [userQuestionCount, setUserQuestionCount] = useState(0)
   const [speedDialOpen, setSpeedDialOpen] = useState(false)
-  
-  // Debug: Log loading state changes
-  useEffect(() => {
-    console.log('Loading state changed:', loading)
-  }, [loading])
+  const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' })
+  const [formErrors, setFormErrors] = useState({})
   const [openDialog, setOpenDialog] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
   const [formData, setFormData] = useState({ nombre: '', apellidos: '', email: '', telefono: '', semana_de_embarazo: '', nombre_de_ginecologo: '', telefonos_de_contacto: '', hospital_donde_se_atendera: '', mensaje: '' })
@@ -280,22 +294,24 @@ export default function App() {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))     // <=600px
   const isTablet = useMediaQuery(theme.breakpoints.between('sm','md')) // 600–900px
+  const prefersReducedMotion = usePrefersReducedMotion()
+
+  const notify = (message, severity = 'success') => setSnack({ open: true, message, severity })
 
   
   const scrollRef = useRef()
 
+  // Agent (concierge) feature flag + server-side session id.
+  // Set VITE_AGENT_ENABLED=true to route chat through /api/agents/concierge.
+  const AGENT_ENABLED = import.meta.env.VITE_AGENT_ENABLED === 'true'
+  const agentSessionRef = useRef(null)
+
   const chatMaxWidth = isMobile ? '92vw' : isTablet ? 640 : 720
-  const chipsMaxWidth = isMobile ? '92vw' : isTablet ? 640 : 720
   const promptMaxWidth = isMobile ? '92vw' : 600
-  const messagesBottom = isMobile ? 175 : 140
   const logoSize       = isMobile ? 64  : 140
   const bodyFontSize   = isMobile ? 13  : 14
 
-  const promptHeight = isMobile ? 60 : 70 // estimated px height of prompt bar
   const footerHeight = isMobile ? 20 : 24 // estimated px height of footer text
-
-  const promptBottom = footerHeight + 6   // 6px gap above footer
-  const chipsBottom  = promptBottom + promptHeight // 6px gap above prompt
 
 
 
@@ -304,6 +320,18 @@ export default function App() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
+
+  useEffect(() => {
+    try { sessionStorage.setItem('teravida-chat', JSON.stringify(messages)) } catch { /* storage unavailable */ }
+  }, [messages])
+
+  useEffect(() => {
+    try { localStorage.setItem('teravida-dark-mode', darkMode ? '1' : '0') } catch { /* storage unavailable */ }
+  }, [darkMode])
+
+  useEffect(() => {
+    try { localStorage.setItem('teravida-language', currentLanguage) } catch { /* storage unavailable */ }
+  }, [currentLanguage])
 
   // const handleChange = (field) => (e) => setFormData({ ...formData, [field]: e.target.value })
 
@@ -322,17 +350,26 @@ export default function App() {
 
 
 const handleSubmit = async () => {
-  // 1) Validate only required fields for the current tab
+  // 1) Validate only required fields for the current tab (errors shown inline per field)
   const FIELD_SETS = getFieldSets(currentLanguage);
   const required = FIELD_SETS[activeTab].filter(f => f.required).map(f => f.name);
-  const missing = required.filter(k => !String(formData[k] ?? '').trim());
-  if (missing.length) {
-    alert(currentLanguage === 'es' 
-      ? `Faltan campos: ${missing.join(', ')}` 
-      : `Missing fields: ${missing.join(', ')}`
+  const errors = {};
+  const requiredMsg = currentLanguage === 'es' ? 'Campo requerido' : 'Required field';
+  required.forEach(k => {
+    if (!String(formData[k] ?? '').trim()) errors[k] = requiredMsg;
+  });
+  if (!errors.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(formData.email ?? '').trim())) {
+    errors.email = currentLanguage === 'es' ? 'E-mail inválido' : 'Invalid e-mail';
+  }
+  if (Object.keys(errors).length) {
+    setFormErrors(errors);
+    notify(
+      currentLanguage === 'es' ? 'Revisa los campos marcados' : 'Please check the highlighted fields',
+      'error'
     );
     return;
   }
+  setFormErrors({});
 
   // 2) Set "origen" label for the email subject
   const origen =
@@ -370,7 +407,7 @@ const handleSubmit = async () => {
     // Call your email function (Resend)
     await sendContact(payload, origen);
 
-    alert(currentLanguage === 'es' ? 'Formulario enviado con éxito' : 'Form submitted successfully');
+    notify(currentLanguage === 'es' ? 'Formulario enviado con éxito' : 'Form submitted successfully');
     setOpenDialog(false);
     // optional: clear only the fields for the current tab
     const FIELD_SETS_CLEAR = getFieldSets(currentLanguage);
@@ -379,11 +416,12 @@ const handleSubmit = async () => {
     setFormData(cleared);
   } catch (err) {
     console.error(err);
-    alert(currentLanguage === 'es' ? 'Error al enviar el formulario' : 'Error submitting form');
+    notify(currentLanguage === 'es' ? 'Error al enviar el formulario' : 'Error submitting form', 'error');
   }
 };
 
   const sendMessage = async (customInput) => {
+  if (loading) return; // don't allow overlapping streams
   const contentToSend = customInput || input;
   if (!contentToSend.trim()) return;
   
@@ -404,11 +442,32 @@ const handleSubmit = async () => {
   setUserQuestionCount(prev => prev + 1);
 
   try {
-    const res = await fetch('/api/chat/stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: newMessages, language: currentLanguage })
-    });
+    const res = AGENT_ENABLED
+      ? await fetch('/api/agents/concierge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: contentToSend,
+            language: currentLanguage,
+            sessionId: agentSessionRef.current,
+          })
+        })
+      : await fetch('/api/chat/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: newMessages, language: currentLanguage })
+        });
+
+    // Persist the server-side session id so multi-turn memory works.
+    if (AGENT_ENABLED) {
+      const sid = res.headers.get('X-Session-Id');
+      if (sid) agentSessionRef.current = sid;
+    }
+
+    if (!res.ok || !res.body) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(`API ${res.status}: ${detail.slice(0, 200)}`);
+    }
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -451,21 +510,15 @@ const handleSubmit = async () => {
     clearInterval(timer);
     flush();
     
-    // Save to conversation history
-    setConversationHistory(prev => [...prev, {
-      id: Date.now(),
-      messages: [...newMessages, { ...assistantMessage, content: fullText }],
-      timestamp: new Date().toISOString(),
-      language: currentLanguage
-    }]);
-    
     // Note: Meeting drawer is now replaced with inline button in chat
     
   } catch (error) {
     console.error('Chat error:', error);
-    setMessages([...newMessages, { 
-      role: 'assistant', 
-      content: 'Lo siento, hubo un error al procesar tu consulta. Por favor, intenta nuevamente.',
+    setMessages([...newMessages, {
+      role: 'assistant',
+      content: currentLanguage === 'es'
+        ? 'Lo siento, hubo un error al procesar tu consulta. Por favor, intenta nuevamente.'
+        : 'Sorry, there was an error processing your question. Please try again.',
       timestamp: new Date().toISOString()
     }]);
   }
@@ -509,10 +562,10 @@ const handleSubmit = async () => {
         
         try {
           await navigator.clipboard.writeText(conversationText);
-          alert(currentLanguage === 'es' ? 'Conversación copiada al portapapeles' : 'Conversation copied to clipboard');
+          notify(currentLanguage === 'es' ? 'Conversación copiada al portapapeles' : 'Conversation copied to clipboard');
         } catch (err) {
           console.error('Failed to copy conversation:', err);
-          alert(currentLanguage === 'es' ? 'Error al copiar la conversación' : 'Error copying conversation');
+          notify(currentLanguage === 'es' ? 'Error al copiar la conversación' : 'Error copying conversation', 'error');
         }
       };
 
@@ -522,8 +575,6 @@ const handleSubmit = async () => {
 
   const changeLanguage = (lang) => {
     setCurrentLanguage(lang);
-    // Clear conversation when changing language to avoid mixed language context
-    setConversationHistory([]);
     setUserQuestionCount(0);
   };
 
@@ -531,10 +582,10 @@ const handleSubmit = async () => {
   const copyMessageContent = async (content) => {
     try {
       await navigator.clipboard.writeText(content);
-      alert(currentLanguage === 'es' ? 'Mensaje copiado al portapapeles' : 'Message copied to clipboard');
+      notify(currentLanguage === 'es' ? 'Mensaje copiado al portapapeles' : 'Message copied to clipboard');
     } catch (err) {
       console.error('Failed to copy message:', err);
-      alert(currentLanguage === 'es' ? 'Error al copiar el mensaje' : 'Error copying message');
+      notify(currentLanguage === 'es' ? 'Error al copiar el mensaje' : 'Error copying message', 'error');
     }
   };
 
@@ -563,11 +614,6 @@ const handleSubmit = async () => {
   // Check if we should show meeting drawer (every 3 questions)
   const shouldShowMeetingDrawer = () => {
     return userQuestionCount > 0 && userQuestionCount % 3 === 0;
-  };
-
-  // Open meeting drawer
-  const openMeetingDrawer = () => {
-    setMeetingDrawerOpen(true);
   };
 
   // Close meeting drawer
@@ -650,7 +696,9 @@ const renderForm = () => {
           <TextField
             fullWidth variant="filled" label={lang.nombre}
             required value={formData.nombre || ''}
-            onChange={(e)=>setFormData(p=>({...p,nombre:e.target.value}))}
+            error={!!formErrors.nombre}
+            helperText={formErrors.nombre || ''}
+            onChange={(e)=>{ setFormData(p=>({...p,nombre:e.target.value})); setFormErrors(p=>({...p,nombre:undefined})); }}
             sx={TF_FILLED_SX(darkMode)}
           />
         </Grid>
@@ -666,7 +714,9 @@ const renderForm = () => {
           <TextField
             fullWidth variant="filled" label={lang.email} type="email"
             required value={formData.email || ''}
-            onChange={(e)=>setFormData(p=>({...p,email:e.target.value}))}
+            error={!!formErrors.email}
+            helperText={formErrors.email || ''}
+            onChange={(e)=>{ setFormData(p=>({...p,email:e.target.value})); setFormErrors(p=>({...p,email:undefined})); }}
             sx={TF_FILLED_SX(darkMode)}
           />
         </Grid>
@@ -936,17 +986,12 @@ const renderForm = () => {
         <ambientLight intensity={0.3} />
         <directionalLight position={[5, 5, 5]} intensity={0.4} castShadow />
         <Environment preset="sunset" background={false} />
-        <AutoOrbitCamera isAIResponding={loading} />
-        {interactiveMode ? (
-          <InteractiveCell isAIResponding={loading} />
-        ) : (
-          <>
-            <Membrane isAIResponding={loading} />
+        <CellCameraRig isAIResponding={loading} reducedMotion={prefersReducedMotion} />
+        <Membrane isAIResponding={loading} reducedMotion={prefersReducedMotion} />
         {/* <GlowRing /> */}
-            <Nucleus isAIResponding={loading} />
-            {/* <Cytoplasm isAIResponding={loading} /> */}
-          </>
-        )}
+        <Nucleus isAIResponding={loading} reducedMotion={prefersReducedMotion} />
+        {/* <Cytoplasm isAIResponding={loading} /> */}
+        <AdaptiveDpr />
         <EffectComposer>
           <Bloom 
             intensity={0.15} 
@@ -1503,7 +1548,7 @@ const renderForm = () => {
 
         <Dialog
           open={openDialog}
-          onClose={() => setOpenDialog(false)}
+          onClose={() => { setOpenDialog(false); setFormErrors({}); }}
           fullScreen={isMobile}
           PaperProps={{
             sx: {
@@ -1566,8 +1611,8 @@ const renderForm = () => {
         </DialogContent>
 
         <DialogActions>
-          <Button 
-            onClick={() => setOpenDialog(false)} 
+          <Button
+            onClick={() => { setOpenDialog(false); setFormErrors({}); }}
             sx={{
               fontFamily: 'Manrope', 
               fontWeight: 700,
@@ -1719,9 +1764,11 @@ const renderForm = () => {
               startIcon={<VideoCallIcon />}
               onClick={() => {
                 // Here you could integrate with a video calling service
-                alert(currentLanguage === 'es' 
-                  ? 'Próximamente: Consultas por video en tiempo real'
-                  : 'Coming soon: Real-time video consultations'
+                notify(
+                  currentLanguage === 'es'
+                    ? 'Próximamente: Consultas por video en tiempo real'
+                    : 'Coming soon: Real-time video consultations',
+                  'info'
                 );
               }}
               sx={{
@@ -1750,6 +1797,23 @@ const renderForm = () => {
           </Box>
         </Box>
       </Drawer>
+
+      {/* Global feedback (replaces alert()) */}
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={4000}
+        onClose={() => setSnack(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnack(s => ({ ...s, open: false }))}
+          severity={snack.severity}
+          variant="filled"
+          sx={{ fontFamily: 'Manrope' }}
+        >
+          {snack.message}
+        </Alert>
+      </Snackbar>
     </div>
   )
 }

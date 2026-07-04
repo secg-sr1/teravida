@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "smoke": "node scripts/smoke.mjs",
+    "ingest": "node scripts/ingest.mjs",
+    "agent": "node scripts/test-agent.mjs",
+    "eval": "node evals/run.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -17,6 +21,7 @@
     "@react-three/drei": "^10.6.1",
     "@react-three/fiber": "^9.3.0",
     "@react-three/postprocessing": "^3.0.4",
+    "@supabase/supabase-js": "^2.110.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
@@ -41,6 +46,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
+    "pdf-parse": "^1.1.1",
     "vite": "^7.0.4"
   }
 }
