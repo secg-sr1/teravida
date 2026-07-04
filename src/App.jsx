@@ -1012,8 +1012,8 @@ const renderForm = () => {
           zIndex:1
         }}>
           {currentLanguage === 'es' 
-            ? '© 2025 Supervisado por el Departamento de Investigación & Desarrollo en Stem Care. | Comprueba la información importante ó contáctanos.'
-            : '© 2025 Supervised by the Research & Development Department at Stem Care. | Verify important information or contact us.'
+            ? '© 2026 Supervisado por el Departamento de Investigación & Desarrollo en Stem Care. | Comprueba la información importante ó contáctanos.'
+            : '© 2026 Supervised by the Research & Development Department at Stem Care. | Verify important information or contact us.'
           }
 </footer>
 
