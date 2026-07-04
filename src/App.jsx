@@ -305,6 +305,8 @@ export default function App() {
   // Set VITE_AGENT_ENABLED=true to route chat through /api/agents/concierge.
   const AGENT_ENABLED = import.meta.env.VITE_AGENT_ENABLED === 'true'
   const agentSessionRef = useRef(null)
+  const [pendingApprovals, setPendingApprovals] = useState([])
+  const [approvalBusy, setApprovalBusy] = useState(null)
 
   const chatMaxWidth = isMobile ? '92vw' : isTablet ? 640 : 720
   const promptMaxWidth = isMobile ? '92vw' : 600
@@ -509,7 +511,18 @@ const handleSubmit = async () => {
     // 4) flush final
     clearInterval(timer);
     flush();
-    
+
+    // 5) agent may have proposed write actions awaiting human approval
+    if (AGENT_ENABLED && agentSessionRef.current) {
+      try {
+        const ar = await fetch(`/api/agents/approvals?sessionId=${agentSessionRef.current}`);
+        if (ar.ok) {
+          const j = await ar.json();
+          setPendingApprovals(j.pending || []);
+        }
+      } catch { /* non-fatal */ }
+    }
+
     // Note: Meeting drawer is now replaced with inline button in chat
     
   } catch (error) {
@@ -526,6 +539,42 @@ const handleSubmit = async () => {
   setLoading(false);
   setTyping(false);
 };
+
+  // Approve/reject a proposed write action (createLead / sendEmail).
+  const decideApproval = async (approvalId, decision) => {
+    setApprovalBusy(approvalId);
+    try {
+      const res = await fetch('/api/agents/approvals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approvalId, decision }),
+      });
+      const j = await res.json().catch(() => ({}));
+      setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
+
+      let text;
+      if (decision === 'reject') {
+        text = currentLanguage === 'es' ? 'Solicitud cancelada.' : 'Request cancelled.';
+      } else if (res.ok && j.status === 'approved') {
+        text = currentLanguage === 'es'
+          ? '✅ Solicitud confirmada. El equipo de Stem Care recibió tu información.'
+          : '✅ Request confirmed. The Stem Care team has received your information.';
+      } else {
+        text = currentLanguage === 'es'
+          ? '⚠️ No se pudo procesar la solicitud. Por favor intenta de nuevo.'
+          : '⚠️ Could not process the request. Please try again.';
+      }
+      setMessages(prev => [...prev, { role: 'assistant', content: text, timestamp: new Date().toISOString() }]);
+    } catch {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: currentLanguage === 'es' ? '⚠️ Error al procesar la solicitud.' : '⚠️ Error processing the request.',
+        timestamp: new Date().toISOString(),
+      }]);
+    } finally {
+      setApprovalBusy(null);
+    }
+  };
 
 
   const handleChipClick = (question) => {
@@ -1455,6 +1504,41 @@ const renderForm = () => {
         </Button>
       </Box>
     )}
+
+    {/* Human-approval cards for agent write actions (createLead / sendEmail) */}
+    {AGENT_ENABLED && pendingApprovals.map((a) => (
+      <Box
+        key={a.id}
+        sx={{
+          mt: 2, p: 1.5, borderRadius: 2, border: '1px solid',
+          borderColor: darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)',
+          backgroundColor: darkMode ? 'rgba(125,125,168,0.18)' : 'rgba(125,125,168,0.10)',
+        }}
+      >
+        <Typography sx={{ fontFamily: 'Manrope', fontWeight: 600, fontSize: bodyFontSize, mb: 0.5, color: darkMode ? '#fff' : '#000' }}>
+          {currentLanguage === 'es' ? 'Confirmar solicitud' : 'Confirm request'}
+        </Typography>
+        <Typography sx={{ fontFamily: 'Manrope', fontSize: bodyFontSize, mb: 1.5, color: darkMode ? '#ddd' : '#333' }}>
+          {a.proposed_action?.summary || (currentLanguage === 'es' ? 'Acción pendiente de confirmación' : 'Action pending confirmation')}
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            size="small" variant="contained" disabled={approvalBusy === a.id}
+            onClick={() => decideApproval(a.id, 'approve')}
+            sx={{ fontFamily: 'Manrope', fontWeight: 600, backgroundColor: '#7d7da8', color: 'white', borderRadius: 2, '&:hover': { backgroundColor: '#8787bf' } }}
+          >
+            {currentLanguage === 'es' ? 'Confirmar' : 'Confirm'}
+          </Button>
+          <Button
+            size="small" variant="outlined" disabled={approvalBusy === a.id}
+            onClick={() => decideApproval(a.id, 'reject')}
+            sx={{ fontFamily: 'Manrope', borderRadius: 2, color: darkMode ? '#fff' : '#000', borderColor: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}
+          >
+            {currentLanguage === 'es' ? 'Cancelar' : 'Cancel'}
+          </Button>
+        </Box>
+      </Box>
+    ))}
 
         </Box>
       </Collapse>
