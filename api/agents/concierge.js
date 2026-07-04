@@ -6,6 +6,7 @@
 //   body: { message: string, language?: 'es'|'en', sessionId?: uuid }
 //   res:  streamed text/plain tokens; header X-Session-Id
 
+import { Buffer } from 'node:buffer';
 import { setCorsHeaders } from '../_cors.mjs';
 import { runConciergeStream } from '../../lib/agent/run.mjs';
 import { createSession } from '../../lib/agent/memory.mjs';

@@ -11,6 +11,7 @@
     "smoke": "node scripts/smoke.mjs",
     "ingest": "node scripts/ingest.mjs",
     "agent": "node scripts/test-agent.mjs",
+    "approve": "node scripts/test-approval.mjs",
     "eval": "node evals/run.mjs"
   },
   "dependencies": {
