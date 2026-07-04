@@ -1,18 +1,25 @@
 // /api/chat/stream.js
 import { SYSTEM_ES, EDU_CHIPS, pickCta } from './policy.es.mjs';
 import { SYSTEM_EN, EDU_CHIPS_EN, pickCtaEn } from './policy.en.mjs';
-import { isEveryNth, chipsLine } from './helpers.mjs';
+import { isEveryNth } from './helpers.mjs';
+import { setCorsHeaders } from '../_cors.mjs';
+import { rateLimit, clientIp } from '../../lib/agent/ratelimit.mjs';
+import process from 'node:process';
 
 export default async function handler(req, res) {
   // CORS preflight (optional)
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    setCorsHeaders(req, res);
     return res.status(204).end();
   }
 
   try {
+    // Rate limit to protect OpenAI spend (this endpoint is unauthenticated).
+    if (!(await rateLimit(`chat:${clientIp(req)}`, 15, 60))) {
+      setCorsHeaders(req, res);
+      return res.status(429).json({ error: 'Too many requests, please slow down.' });
+    }
+
     const { messages = [], language = 'es', context = '' } = req.body;
 
     // 1) Gate CTA: solo cada 3er turno del usuario (3, 6, 9, …)
@@ -104,7 +111,7 @@ export default async function handler(req, res) {
     // Set headers for streaming response
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    setCorsHeaders(req, res);
     res.setHeader('X-Model', 'gpt-4o-mini');
     res.status(200);
 
@@ -151,13 +158,4 @@ export default async function handler(req, res) {
       detail: err?.message || String(err),
     });
   }
-}
-
-// Helpers locales
-function corsHeaders() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
 }
