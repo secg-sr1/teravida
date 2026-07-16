@@ -108,37 +108,48 @@ export default async function handler(req, res) {
     res.setHeader('X-Model', 'gpt-4o-mini');
     res.status(200);
 
-    // Pipe the stream to the response
+    // Pipe the stream to the response. SSE events can be split across network
+    // chunks, so incomplete trailing lines must be carried over to the next
+    // read — otherwise their tokens are silently dropped.
     const reader = upstream.body.getReader();
     const decoder = new TextDecoder();
+    let carry = '';
+
+    const handleLine = (line) => {
+      const s = line.trim();
+      if (!s || !s.startsWith('data:')) return false;
+      const data = s.slice(5).trim();
+      if (data === '[DONE]') return true;
+      try {
+        const json = JSON.parse(data);
+        const token = json.choices?.[0]?.delta?.content || '';
+        if (token) {
+          res.write(token);
+        }
+      } catch {
+        // malformed event; skip
+      }
+      return false;
+    };
 
     try {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-        
+        carry += decoder.decode(value, { stream: true });
+        const lines = carry.split('\n');
+        carry = lines.pop(); // last piece may be incomplete; keep for next chunk
+
         for (const line of lines) {
-          const s = line.trim();
-          if (!s || !s.startsWith('data:')) continue;
-          const data = s.slice(5).trim();
-          if (data === '[DONE]') {
+          if (handleLine(line)) {
             res.end();
             return;
           }
-          try {
-            const json = JSON.parse(data);
-            const token = json.choices?.[0]?.delta?.content || '';
-            if (token) {
-              res.write(token);
-            }
-          } catch {
-            // ignore partial JSON
-          }
         }
       }
+      carry += decoder.decode();
+      if (carry) handleLine(carry);
       res.end();
     } catch (streamErr) {
       console.error('Stream error:', streamErr);
