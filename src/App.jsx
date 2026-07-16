@@ -307,6 +307,46 @@ const MarkdownMessage = memo(function MarkdownMessage({ content, role, darkMode,
   );
 });
 
+// While a message is still streaming we render it as plain text — re-parsing
+// markdown on every animation frame costs ~half a second per update (rehype-raw
+// + the WebGL scene contend for the main thread), which is what made the type
+// effect jump word-by-word. Plain text renders in ~1ms, so the reveal stays
+// smooth; the message is handed to MarkdownMessage for full formatting the
+// moment it completes. A soft caret keeps it feeling alive while typing.
+const StreamingText = memo(function StreamingText({ content, darkMode, fontSize }) {
+  return (
+    <Box
+      sx={{
+        color: darkMode ? '#e0e0e0' : '#333333',
+        fontFamily: 'Manrope',
+        fontWeight: 400,
+        fontSize,
+        lineHeight: 1.6,
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+      }}
+    >
+      {content}
+      <Box
+        component="span"
+        sx={{
+          display: 'inline-block',
+          width: '2px',
+          height: '1em',
+          marginLeft: '1px',
+          verticalAlign: 'text-bottom',
+          backgroundColor: darkMode ? '#e0e0e0' : '#7d7da8',
+          animation: 'tvCaret 1s steps(1) infinite',
+          '@keyframes tvCaret': {
+            '0%, 50%': { opacity: 1 },
+            '50.01%, 100%': { opacity: 0 },
+          },
+        }}
+      />
+    </Box>
+  );
+});
+
 
 import Logo from './assets/STEM CARE-03.png'
 
@@ -744,54 +784,76 @@ const handleSubmit = async () => {
     };
     setMessages([...newMessages, assistantMessage]);
 
-    // 2) typewriter pacing: the network fills `buffer`; a ~60Hz drain loop
-    // moves a few characters per tick into the visible message. The take size
-    // grows with the backlog so rendering never falls behind the model.
-    let fullText = '';
-    let buffer = '';
+    // 2) typewriter: the network fills `received`; a requestAnimationFrame loop
+    // reveals it at an even, time-based pace (chars/second, not chars/tick) so
+    // the text types smoothly regardless of how bursty the network delivery is.
+    // Using rAF instead of setTimeout keeps updates aligned to the browser's
+    // paint and prevents callbacks from piling up when a frame runs long.
+    let received = '';
+    let shown = 0;
     let streamDone = false;
+    let finishReveal;
+    const drained = new Promise((r) => { finishReveal = r; });
 
-    const drained = new Promise((resolve) => {
-      const TICK_MS = 16;
-      const drain = () => {
-        if (buffer) {
-          const take = document.hidden
-            ? buffer.length // tab not visible: skip the animation
-            : Math.max(2, Math.ceil(buffer.length / 24));
-          fullText += buffer.slice(0, take);
-          buffer = buffer.slice(take);
-          setTyping(false); // first visible text: hand off from the dots
-          setMessages(prev => {
-            const updated = [...prev];
-            updated[updated.length - 1] = {
-              ...updated[updated.length - 1],
-              content: fullText
-            };
-            return updated;
-          });
-        }
-        if (streamDone && !buffer) return resolve();
-        setTimeout(drain, TICK_MS);
-      };
-      drain();
-    });
+    const CPS = 90;       // steady typing speed (characters per second)
+    const CATCHUP = 260;  // if we trail the model by more than this, speed up
+    let lastTs = performance.now();
+    let rafId = 0;
+
+    const revealStep = (now) => {
+      const dt = Math.min(now - lastTs, 200); // clamp after a long/background frame
+      lastTs = now;
+      if (shown < received.length) {
+        const behind = received.length - shown;
+        // steady pace, but accelerate smoothly when the backlog is large so the
+        // tail never drags far behind the model once the network is done
+        const speed = behind > CATCHUP ? CPS * (behind / CATCHUP) : CPS;
+        const advance = document.hidden
+          ? behind // tab not visible: skip the animation
+          : Math.max(1, Math.round((speed * dt) / 1000));
+        shown = Math.min(received.length, shown + advance);
+        setTyping(false); // first visible text: hand off from the dots
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            content: received.slice(0, shown),
+          };
+          return updated;
+        });
+      }
+      if (streamDone && shown >= received.length) { finishReveal(); return; }
+      rafId = requestAnimationFrame(revealStep);
+    };
+    rafId = requestAnimationFrame(revealStep);
 
     // 3) leer el stream y sólo llenar el buffer
     try {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+        received += decoder.decode(value, { stream: true });
       }
-      buffer += decoder.decode(); // flush a trailing split multi-byte char (á, ñ, …)
+      received += decoder.decode(); // flush a trailing split multi-byte char (á, ñ, …)
     } catch (err) {
-      buffer = ''; // stop typing where we are; the outer catch reports the error
+      cancelAnimationFrame(rafId); // stop typing; the outer catch reports the error
       throw err;
     } finally {
       streamDone = true;
+      if (document.hidden) {
+        // rAF is paused while the tab is hidden — complete the reveal directly
+        cancelAnimationFrame(rafId);
+        shown = received.length;
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { ...updated[updated.length - 1], content: received };
+          return updated;
+        });
+        finishReveal();
+      }
     }
 
-    // 4) wait for the drain to finish typing out the tail
+    // 4) wait for the reveal to finish typing out the tail
     await drained;
 
     // 5) agent may have proposed write actions awaiting human approval
@@ -1381,13 +1443,23 @@ const renderForm = () => {
             : `1px solid ${darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
           transition: 'all 0.2s ease-in-out'
         }}>
-        <MarkdownMessage
-          content={m.content}
-          role={m.role}
-          darkMode={darkMode}
-          fontSize={bodyFontSize}
-        />
-      
+        {loading && m.role === 'assistant' && i === messages.length - 1
+          ? (
+            <StreamingText
+              content={m.content}
+              darkMode={darkMode}
+              fontSize={bodyFontSize}
+            />
+          )
+          : (
+            <MarkdownMessage
+              content={m.content}
+              role={m.role}
+              darkMode={darkMode}
+              fontSize={bodyFontSize}
+            />
+          )}
+
       {/* Timestamp and Action Buttons */}
       {m.timestamp && (
         <Box
