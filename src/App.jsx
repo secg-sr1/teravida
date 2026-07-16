@@ -60,29 +60,25 @@ import useMediaQuery from '@mui/material/useMediaQuery'
 // Memoized message body: parsing markdown is the expensive part of rendering a
 // message, so during streaming only the in-progress bubble re-parses — earlier
 // bubbles keep their rendered output. Props are all primitives on purpose.
-const MarkdownMessage = memo(function MarkdownMessage({ content, role, darkMode, fontSize }) {
-  return (
-    <Box
-      sx={{
-        color: darkMode
-          ? (role === 'user' ? '#ffffff' : '#e0e0e0')
-          : (role === 'user' ? '#1a1a1a' : '#333333'),
-        fontFamily: 'Manrope',
-        fontWeight: role === 'user' ? 600 : 400,
-        fontSize,
-        lineHeight: 1.5,
-        '& p': { margin: 0, marginBottom: '0.8rem', lineHeight: 1.6, color: 'inherit' },
-        '& ul, & ol': { margin: 0, marginBottom: '0.8rem', paddingLeft: '1.5rem', color: 'inherit' },
-        '& li': { margin: 0, marginBottom: '0.4rem', lineHeight: 1.5, color: 'inherit' },
-        '& h1, & h2, & h3': { margin: 0, marginBottom: '0.5rem', marginTop: '0.8rem', color: 'inherit' },
-        '& strong': { fontWeight: 600, color: 'inherit' },
-        '& em': { fontStyle: 'italic', color: 'inherit' }
-      }}
-    >
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw]}
-        components={{
+// Stable module-level plugin arrays. Passing a fresh array on every render
+// makes react-markdown re-run its whole pipeline, so we reuse these references.
+const MD_REMARK = [remarkGfm];
+const MD_REHYPE = [rehypeRaw];
+const MD_REHYPE_NONE = [];
+
+// The concierge prepends an <!--intent=...--> metadata comment; strip complete
+// comments and a half-typed trailing one so it never flashes while streaming.
+const stripMeta = (s) => s.replace(/<!--[sS]*?-->/g, '').replace(/<!--[sS]*$/, '');
+
+// The custom renderers depend only on darkMode, so build one object per theme
+// and cache it. A stable components object lets react-markdown reconcile cheaply
+// on every streamed update instead of rebuilding every node — this is what keeps
+// live markdown affordable enough to type smoothly.
+const _mdComponentsCache = {};
+function buildMdComponents(darkMode) {
+  const key = darkMode ? 'dark' : 'light';
+  if (_mdComponentsCache[key]) return _mdComponentsCache[key];
+  const components = {
           p: (props) => (
             <p
               style={{
@@ -299,50 +295,54 @@ const MarkdownMessage = memo(function MarkdownMessage({ content, role, darkMode,
               {...props}
             />
           )
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </Box>
-  );
-});
+  };
+  _mdComponentsCache[key] = components;
+  return components;
+}
 
-// While a message is still streaming we render it as plain text — re-parsing
-// markdown on every animation frame costs ~half a second per update (rehype-raw
-// + the WebGL scene contend for the main thread), which is what made the type
-// effect jump word-by-word. Plain text renders in ~1ms, so the reveal stays
-// smooth; the message is handed to MarkdownMessage for full formatting the
-// moment it completes. A soft caret keeps it feeling alive while typing.
-const StreamingText = memo(function StreamingText({ content, darkMode, fontSize }) {
+// Message body, rendered as live markdown even while streaming. During the
+// stream we skip rehype-raw (the heaviest stage) and show a blinking caret;
+// once complete, the full pipeline runs so any raw HTML is honored.
+const MarkdownMessage = memo(function MarkdownMessage({ content, role, darkMode, fontSize, isStreaming }) {
+  const components = buildMdComponents(darkMode);
   return (
     <Box
       sx={{
-        color: darkMode ? '#e0e0e0' : '#333333',
+        color: darkMode
+          ? (role === 'user' ? '#ffffff' : '#e0e0e0')
+          : (role === 'user' ? '#1a1a1a' : '#333333'),
         fontFamily: 'Manrope',
-        fontWeight: 400,
+        fontWeight: role === 'user' ? 600 : 400,
         fontSize,
-        lineHeight: 1.6,
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
+        lineHeight: 1.5,
+        '& p': { margin: 0, marginBottom: '0.8rem', lineHeight: 1.6, color: 'inherit' },
+        '& ul, & ol': { margin: 0, marginBottom: '0.8rem', paddingLeft: '1.5rem', color: 'inherit' },
+        '& li': { margin: 0, marginBottom: '0.4rem', lineHeight: 1.5, color: 'inherit' },
+        '& h1, & h2, & h3': { margin: 0, marginBottom: '0.5rem', marginTop: '0.8rem', color: 'inherit' },
+        '& strong': { fontWeight: 600, color: 'inherit' },
+        '& em': { fontStyle: 'italic', color: 'inherit' },
+        ...(isStreaming ? {
+          '& > *:last-child::after': {
+            content: '""',
+            display: 'inline-block',
+            width: '2px',
+            height: '1em',
+            marginLeft: '2px',
+            verticalAlign: 'text-bottom',
+            backgroundColor: darkMode ? '#e0e0e0' : '#7d7da8',
+            animation: 'tvCaret 1s steps(1) infinite',
+          },
+          '@keyframes tvCaret': { '0%, 50%': { opacity: 1 }, '50.01%, 100%': { opacity: 0 } },
+        } : {}),
       }}
     >
-      {content}
-      <Box
-        component="span"
-        sx={{
-          display: 'inline-block',
-          width: '2px',
-          height: '1em',
-          marginLeft: '1px',
-          verticalAlign: 'text-bottom',
-          backgroundColor: darkMode ? '#e0e0e0' : '#7d7da8',
-          animation: 'tvCaret 1s steps(1) infinite',
-          '@keyframes tvCaret': {
-            '0%, 50%': { opacity: 1 },
-            '50.01%, 100%': { opacity: 0 },
-          },
-        }}
-      />
+      <ReactMarkdown
+        remarkPlugins={MD_REMARK}
+        rehypePlugins={isStreaming ? MD_REHYPE_NONE : MD_REHYPE}
+        components={components}
+      >
+        {stripMeta(content)}
+      </ReactMarkdown>
     </Box>
   );
 });
@@ -481,6 +481,48 @@ function DynamicDepthOfField({ isAIResponding = false }) {
     />
   )
 }
+
+// The 3D scene depends only on loading / darkMode / reducedMotion / isMobile —
+// never on the chat messages. Memoizing it keeps every streamed character update
+// (which re-renders App) from re-rendering the whole Three.js + postprocessing
+// tree, which is what triggered the EffectComposer "max update depth" loop and
+// starved the typewriter. R3F drives its own animation loop, so the scene keeps
+// moving smoothly while only the chat text re-renders.
+const Scene = memo(function Scene({ loading, darkMode, prefersReducedMotion, isMobile }) {
+  return (
+    <Canvas
+      camera={{ position: [0, 0, 5], fov: isMobile ? 55 : 50 }}
+      gl={{
+        alpha: true,
+        antialias: true,
+        toneMapping: THREE.ACESFilmicToneMapping,
+        powerPreference: "high-performance"
+      }}
+      shadows
+      dpr={[1, 2]}
+    >
+      <color attach="background" args={[darkMode ? "#1a1a1a" : "#dfe4ea"]} />
+      <ambientLight intensity={0.3} />
+      <directionalLight position={[5, 5, 5]} intensity={0.4} castShadow />
+      <Environment preset="sunset" background={false} />
+      <CellCameraRig isAIResponding={loading} reducedMotion={prefersReducedMotion} />
+      <Membrane isAIResponding={loading} reducedMotion={prefersReducedMotion} />
+      <Nucleus isAIResponding={loading} reducedMotion={prefersReducedMotion} />
+      <AdaptiveDpr />
+      <EffectComposer>
+        <Bloom
+          intensity={0.15}
+          luminanceThreshold={0.7}
+          luminanceSmoothing={0.4}
+          mipmapBlur={true}
+          resolutionX={512}
+          resolutionY={512}
+        />
+        <DynamicDepthOfField isAIResponding={loading} />
+      </EffectComposer>
+    </Canvas>
+  );
+});
 
 
 const TABS = {
@@ -1363,40 +1405,12 @@ const renderForm = () => {
 
 
 
-      <Canvas
-        // camera={{ position: [0, 0, 5], fov: 50 }}
-        camera={{ position: [0, 0, 5], fov: isMobile ? 55 : 50 }}
-        gl={{ 
-          alpha: true, 
-          antialias: true, 
-          toneMapping: THREE.ACESFilmicToneMapping,
-          powerPreference: "high-performance"
-        }}
-        shadows
-        dpr={[1, 2]}
-      >
-        <color attach="background" args={[darkMode ? "#1a1a1a" : "#dfe4ea"]} />
-        <ambientLight intensity={0.3} />
-        <directionalLight position={[5, 5, 5]} intensity={0.4} castShadow />
-        <Environment preset="sunset" background={false} />
-        <CellCameraRig isAIResponding={loading} reducedMotion={prefersReducedMotion} />
-        <Membrane isAIResponding={loading} reducedMotion={prefersReducedMotion} />
-        {/* <GlowRing /> */}
-        <Nucleus isAIResponding={loading} reducedMotion={prefersReducedMotion} />
-        {/* <Cytoplasm isAIResponding={loading} /> */}
-        <AdaptiveDpr />
-        <EffectComposer>
-          <Bloom 
-            intensity={0.15} 
-            luminanceThreshold={0.7} 
-            luminanceSmoothing={0.4}
-            mipmapBlur={true}
-            resolutionX={512}
-            resolutionY={512}
-          />
-          <DynamicDepthOfField isAIResponding={loading} />
-        </EffectComposer>
-      </Canvas>
+      <Scene
+        loading={loading}
+        darkMode={darkMode}
+        prefersReducedMotion={prefersReducedMotion}
+        isMobile={isMobile}
+      />
 
       <Collapse in={hasConversation} timeout={300} unmountOnExit>
         <Box
@@ -1443,22 +1457,13 @@ const renderForm = () => {
             : `1px solid ${darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
           transition: 'all 0.2s ease-in-out'
         }}>
-        {loading && m.role === 'assistant' && i === messages.length - 1
-          ? (
-            <StreamingText
-              content={m.content}
-              darkMode={darkMode}
-              fontSize={bodyFontSize}
-            />
-          )
-          : (
-            <MarkdownMessage
-              content={m.content}
-              role={m.role}
-              darkMode={darkMode}
-              fontSize={bodyFontSize}
-            />
-          )}
+        <MarkdownMessage
+          content={m.content}
+          role={m.role}
+          darkMode={darkMode}
+          fontSize={bodyFontSize}
+          isStreaming={loading && m.role === 'assistant' && i === messages.length - 1}
+        />
 
       {/* Timestamp and Action Buttons */}
       {m.timestamp && (
