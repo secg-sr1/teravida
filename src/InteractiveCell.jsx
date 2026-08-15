@@ -1,61 +1,87 @@
 // InteractiveCell.jsx
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Text, Html } from '@react-three/drei';
-import * as THREE from 'three';
+import { Html } from '@react-three/drei';
 
-export default function InteractiveCell({ isAIResponding = false }) {
+const COMPONENT_INFO = {
+  membrane: {
+    name: { es: 'Membrana Celular', en: 'Cell Membrane' },
+    description: {
+      es: 'Capa externa que protege la célula y controla el intercambio de sustancias.',
+      en: 'Outer layer that protects the cell and controls the exchange of substances.'
+    }
+  },
+  nucleus: {
+    name: { es: 'Núcleo', en: 'Nucleus' },
+    description: {
+      es: 'Centro de control de la célula que contiene el material genético.',
+      en: 'Control center of the cell that contains the genetic material.'
+    }
+  }
+};
+
+export default function InteractiveCell({ isAIResponding = false, language = 'es', reducedMotion = false }) {
   const [hoveredComponent, setHoveredComponent] = useState(null);
   const [clickedComponent, setClickedComponent] = useState(null);
   const membraneRef = useRef();
   const nucleusRef = useRef();
   const cytoplasmRef = useRef();
 
-  const components = {
-    membrane: {
-      name: 'Membrana Celular',
-      description: 'Capa externa que protege la célula y controla el intercambio de sustancias.',
-      color: '#f6b0ffff',
-      position: [0, 0, 0],
-      scale: 1.5
-    },
-    nucleus: {
-      name: 'Núcleo',
-      description: 'Centro de control de la célula que contiene el material genético.',
-      color: '#3a1aff',
-      position: [0, 0, 0],
-      scale: 0.6
+  const lang = COMPONENT_INFO.membrane.name[language] ? language : 'es';
+
+  const cytoplasmPositions = useMemo(() => {
+    const pos = [];
+    for (let i = 0; i < 800; i++) {
+      const r = 1.3 + Math.random() * 0.3;
+      const theta = Math.random() * 2 * Math.PI;
+      const phi = Math.acos(2 * Math.random() - 1);
+      pos.push(
+        r * Math.sin(phi) * Math.cos(theta),
+        r * Math.sin(phi) * Math.sin(theta),
+        r * Math.cos(phi)
+      );
     }
-  };
+    return new Float32Array(pos);
+  }, []);
 
   useFrame(({ clock }) => {
+    if (reducedMotion) return;
+
     const t = clock.getElapsedTime();
-    
-    // Enhanced animations during AI response
     const rotationSpeed = isAIResponding ? 0.2 : 0.1;
     const scaleIntensity = isAIResponding ? 0.04 : 0.02;
-    
+
     if (membraneRef.current) {
       membraneRef.current.rotation.y = t * rotationSpeed;
       const scale = 1 + Math.sin(t * 1.5) * scaleIntensity;
       membraneRef.current.scale.set(scale, scale, scale);
     }
-    
+
     if (nucleusRef.current) {
       nucleusRef.current.rotation.y = t * (rotationSpeed * 1.5);
       const scale = 1 + Math.sin(t * 2) * (scaleIntensity * 1.5);
       nucleusRef.current.scale.set(scale, scale, scale);
     }
-    
+
     if (cytoplasmRef.current) {
       cytoplasmRef.current.rotation.y = t * (rotationSpeed * 0.5);
     }
   });
 
+  // Clicking a component opens its card; clicking it again closes it.
+  // The card stays open until dismissed (no auto-close timer).
   const handleComponentClick = (componentName) => {
-    setClickedComponent(componentName);
-    // Auto-close after 3 seconds
-    setTimeout(() => setClickedComponent(null), 3000);
+    setClickedComponent(prev => (prev === componentName ? null : componentName));
+  };
+
+  const handlePointerOver = (componentName) => {
+    setHoveredComponent(componentName);
+    document.body.style.cursor = 'pointer';
+  };
+
+  const handlePointerOut = () => {
+    setHoveredComponent(null);
+    document.body.style.cursor = '';
   };
 
   return (
@@ -63,9 +89,9 @@ export default function InteractiveCell({ isAIResponding = false }) {
       {/* Membrane */}
       <mesh
         ref={membraneRef}
-        onClick={() => handleComponentClick('membrane')}
-        onPointerOver={() => setHoveredComponent('membrane')}
-        onPointerOut={() => setHoveredComponent(null)}
+        onClick={(e) => { e.stopPropagation(); handleComponentClick('membrane'); }}
+        onPointerOver={(e) => { e.stopPropagation(); handlePointerOver('membrane'); }}
+        onPointerOut={handlePointerOut}
         renderOrder={2}
       >
         <icosahedronGeometry args={[1.5, 12]} />
@@ -75,7 +101,7 @@ export default function InteractiveCell({ isAIResponding = false }) {
           roughness={0.1}
           metalness={0.05}
           depthWrite={false}
-          emissive="#f6b0ffff"
+          emissive="#f6b0ff"
           emissiveIntensity={hoveredComponent === 'membrane' ? 0.3 : 0.1}
         />
       </mesh>
@@ -83,9 +109,9 @@ export default function InteractiveCell({ isAIResponding = false }) {
       {/* Nucleus */}
       <mesh
         ref={nucleusRef}
-        onClick={() => handleComponentClick('nucleus')}
-        onPointerOver={() => setHoveredComponent('nucleus')}
-        onPointerOut={() => setHoveredComponent(null)}
+        onClick={(e) => { e.stopPropagation(); handleComponentClick('nucleus'); }}
+        onPointerOver={(e) => { e.stopPropagation(); handlePointerOver('nucleus'); }}
+        onPointerOut={handlePointerOut}
         renderOrder={1}
       >
         <icosahedronGeometry args={[0.6, 16]} />
@@ -106,17 +132,8 @@ export default function InteractiveCell({ isAIResponding = false }) {
         <bufferGeometry>
           <bufferAttribute
             attach="attributes-position"
-            array={new Float32Array(Array.from({ length: 800 }, () => {
-              const r = 1.3 + Math.random() * 0.3;
-              const theta = Math.random() * 2 * Math.PI;
-              const phi = Math.acos(2 * Math.random() - 1);
-              return [
-                r * Math.sin(phi) * Math.cos(theta),
-                r * Math.sin(phi) * Math.sin(theta),
-                r * Math.cos(phi)
-              ];
-            }).flat())}
-            count={800}
+            array={cytoplasmPositions}
+            count={cytoplasmPositions.length / 3}
             itemSize={3}
           />
         </bufferGeometry>
@@ -141,9 +158,10 @@ export default function InteractiveCell({ isAIResponding = false }) {
             fontFamily: 'Manrope',
             fontWeight: 600,
             textAlign: 'center',
+            whiteSpace: 'nowrap',
             pointerEvents: 'none'
           }}>
-            {components[hoveredComponent].name}
+            {COMPONENT_INFO[hoveredComponent].name[lang]}
           </div>
         </Html>
       )}
@@ -155,18 +173,40 @@ export default function InteractiveCell({ isAIResponding = false }) {
             backgroundColor: 'rgba(0,0,0,0.9)',
             color: 'white',
             padding: '16px',
+            paddingRight: '36px',
             borderRadius: '8px',
             fontSize: '12px',
             fontFamily: 'Manrope',
             maxWidth: '300px',
             textAlign: 'center',
-            pointerEvents: 'none'
+            position: 'relative',
+            pointerEvents: 'auto'
           }}>
+            <button
+              onClick={() => setClickedComponent(null)}
+              aria-label={lang === 'es' ? 'Cerrar' : 'Close'}
+              style={{
+                position: 'absolute',
+                top: 6,
+                right: 6,
+                width: 22,
+                height: 22,
+                border: 'none',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                color: 'white',
+                fontSize: '12px',
+                lineHeight: 1,
+                cursor: 'pointer'
+              }}
+            >
+              ✕
+            </button>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>
-              {components[clickedComponent].name}
+              {COMPONENT_INFO[clickedComponent].name[lang]}
             </h3>
             <p style={{ margin: 0, lineHeight: 1.4 }}>
-              {components[clickedComponent].description}
+              {COMPONENT_INFO[clickedComponent].description[lang]}
             </p>
           </div>
         </Html>
@@ -174,4 +214,3 @@ export default function InteractiveCell({ isAIResponding = false }) {
     </group>
   );
 }
-

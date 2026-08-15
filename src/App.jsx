@@ -68,7 +68,7 @@ const MD_REHYPE_NONE = [];
 
 // The concierge prepends an <!--intent=...--> metadata comment; strip complete
 // comments and a half-typed trailing one so it never flashes while streaming.
-const stripMeta = (s) => s.replace(/<!--[sS]*?-->/g, '').replace(/<!--[sS]*$/, '');
+const stripMeta = (s) => s.replace(/<!--[\s\S]*?-->/g, '').replace(/<!--[\s\S]*$/, '');
 
 // The custom renderers depend only on darkMode, so build one object per theme
 // and cache it. A stable components object lets react-markdown reconcile cheaply
@@ -841,6 +841,29 @@ const handleSubmit = async () => {
     const CATCHUP = 260;  // if we trail the model by more than this, speed up
     let lastTs = performance.now();
     let rafId = 0;
+    let settled = false;
+
+    // rAF is paused while the tab is hidden, so a reveal still in flight when the
+    // user switches away would never finish — leaving `drained` unresolved and
+    // `loading` stuck true, which locks the composer for the rest of the session.
+    // Flushing the remaining text resolves it without waiting for another frame.
+    const flushReveal = () => {
+      if (settled) return;
+      settled = true;
+      cancelAnimationFrame(rafId);
+      document.removeEventListener('visibilitychange', onVisibility);
+      shown = received.length;
+      setTyping(false);
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { ...updated[updated.length - 1], content: received };
+        return updated;
+      });
+      finishReveal();
+    };
+
+    const onVisibility = () => { if (document.hidden && streamDone) flushReveal(); };
+    document.addEventListener('visibilitychange', onVisibility);
 
     const revealStep = (now) => {
       const dt = Math.min(now - lastTs, 200); // clamp after a long/background frame
@@ -864,7 +887,7 @@ const handleSubmit = async () => {
           return updated;
         });
       }
-      if (streamDone && shown >= received.length) { finishReveal(); return; }
+      if (streamDone && shown >= received.length) { flushReveal(); return; }
       rafId = requestAnimationFrame(revealStep);
     };
     rafId = requestAnimationFrame(revealStep);
@@ -878,21 +901,16 @@ const handleSubmit = async () => {
       }
       received += decoder.decode(); // flush a trailing split multi-byte char (á, ñ, …)
     } catch (err) {
-      cancelAnimationFrame(rafId); // stop typing; the outer catch reports the error
+      // stop typing; the outer catch reports the error
+      settled = true;
+      cancelAnimationFrame(rafId);
+      document.removeEventListener('visibilitychange', onVisibility);
+      finishReveal(); // never leave `drained` pending — it gates setLoading(false)
       throw err;
     } finally {
       streamDone = true;
-      if (document.hidden) {
-        // rAF is paused while the tab is hidden — complete the reveal directly
-        cancelAnimationFrame(rafId);
-        shown = received.length;
-        setMessages(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1] = { ...updated[updated.length - 1], content: received };
-          return updated;
-        });
-        finishReveal();
-      }
+      // Already hidden: rAF is paused, so finish the reveal directly.
+      if (document.hidden) flushReveal();
     }
 
     // 4) wait for the reveal to finish typing out the tail
@@ -936,10 +954,13 @@ const handleSubmit = async () => {
         body: JSON.stringify({ approvalId, decision, sessionId: agentSessionRef.current }),
       });
       const j = await res.json().catch(() => ({}));
-      setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
+      // Only drop the card once the server actually recorded the decision —
+      // otherwise a failed call hides an approval that is still pending.
+      const settled = res.ok && (j.status === 'approved' || j.status === 'rejected');
+      if (settled) setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
 
       let text;
-      if (decision === 'reject') {
+      if (decision === 'reject' && res.ok && j.status === 'rejected') {
         text = currentLanguage === 'es' ? 'Solicitud cancelada.' : 'Request cancelled.';
       } else if (res.ok && j.status === 'approved') {
         text = currentLanguage === 'es'
