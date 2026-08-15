@@ -4,7 +4,7 @@
 /////////
 /////////////
 import { Canvas, useFrame } from '@react-three/fiber'
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, memo } from 'react'
 import Membrane from './Membrane'
 import Nucleus from './NucleusMesh'
 import Cytoplasm from './Cytoplasm'
@@ -56,6 +56,296 @@ import rehypeRaw from 'rehype-raw';
 
 import { useTheme } from '@mui/material/styles'
 import useMediaQuery from '@mui/material/useMediaQuery'
+
+// Memoized message body: parsing markdown is the expensive part of rendering a
+// message, so during streaming only the in-progress bubble re-parses — earlier
+// bubbles keep their rendered output. Props are all primitives on purpose.
+// Stable module-level plugin arrays. Passing a fresh array on every render
+// makes react-markdown re-run its whole pipeline, so we reuse these references.
+const MD_REMARK = [remarkGfm];
+const MD_REHYPE = [rehypeRaw];
+const MD_REHYPE_NONE = [];
+
+// The concierge prepends an <!--intent=...--> metadata comment; strip complete
+// comments and a half-typed trailing one so it never flashes while streaming.
+const stripMeta = (s) => s.replace(/<!--[\s\S]*?-->/g, '').replace(/<!--[\s\S]*$/, '');
+
+// The custom renderers depend only on darkMode, so build one object per theme
+// and cache it. A stable components object lets react-markdown reconcile cheaply
+// on every streamed update instead of rebuilding every node — this is what keeps
+// live markdown affordable enough to type smoothly.
+const _mdComponentsCache = {};
+function buildMdComponents(darkMode) {
+  const key = darkMode ? 'dark' : 'light';
+  if (_mdComponentsCache[key]) return _mdComponentsCache[key];
+  const components = {
+          p: (props) => (
+            <p
+              style={{
+                margin: 0,
+                lineHeight: 1.6,
+                marginBottom: '0.8rem',
+                color: darkMode ? '#e0e0e0' : '#333333'
+              }}
+              {...props}
+            />
+          ),
+
+          ul: (props) => (
+            <ul
+              style={{
+                margin: 0,
+                paddingLeft: '1.5rem',
+                lineHeight: 1.6,
+                marginBottom: '0.8rem',
+                color: darkMode ? '#e0e0e0' : '#333333'
+              }}
+              {...props}
+            />
+          ),
+
+          ol: (props) => (
+            <ol
+              style={{
+                margin: 0,
+                paddingLeft: '1.5rem',
+                lineHeight: 1.6,
+                marginBottom: '0.8rem',
+                color: darkMode ? '#e0e0e0' : '#333333'
+              }}
+              {...props}
+            />
+          ),
+
+          li: (props) => (
+            <li
+              style={{
+                margin: 0,
+                marginBottom: '0.4rem',
+                lineHeight: 1.5,
+                color: darkMode ? '#e0e0e0' : '#333333'
+              }}
+              {...props}
+            />
+          ),
+
+          h1: (props) => (
+            <h1
+              style={{
+                margin: 0,
+                fontSize: '1.3rem',
+                fontWeight: 700,
+                marginBottom: '0.6rem',
+                marginTop: '0.8rem',
+                color: darkMode ? '#ffffff' : '#1a1a1a',
+                borderBottom: '2px solid #7d7da8',
+                paddingBottom: '0.3rem',
+                lineHeight: 1.3
+              }}
+              {...props}
+            />
+          ),
+
+          h2: (props) => (
+            <h2
+              style={{
+                margin: 0,
+                fontSize: '1.2rem',
+                fontWeight: 600,
+                marginBottom: '0.5rem',
+                marginTop: '0.7rem',
+                color: darkMode ? '#ffffff' : '#1a1a1a',
+                lineHeight: 1.3
+              }}
+              {...props}
+            />
+          ),
+
+          h3: (props) => (
+            <h3
+              style={{
+                margin: 0,
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                marginBottom: '0.4rem',
+                marginTop: '0.6rem',
+                color: darkMode ? '#ffffff' : '#1a1a1a',
+                lineHeight: 1.3
+              }}
+              {...props}
+            />
+          ),
+
+          a: (props) => (
+            <a
+              style={{
+                textDecoration: 'underline',
+                color: '#7d7da8',
+                fontWeight: 500,
+                transition: 'color 0.2s ease'
+              }}
+              {...props}
+            />
+          ),
+
+          strong: (props) => (
+            <strong
+              style={{
+                fontWeight: 600,
+                color: darkMode ? '#ffffff' : '#1a1a1a'
+              }}
+              {...props}
+            />
+          ),
+
+          em: (props) => (
+            <em
+              style={{
+                fontStyle: 'italic',
+                color: darkMode ? '#b0b0b0' : '#666666'
+              }}
+              {...props}
+            />
+          ),
+
+          code: (props) => (
+            <code
+              style={{
+                backgroundColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                padding: '0.2rem 0.4rem',
+                borderRadius: '4px',
+                fontSize: '0.9em',
+                fontFamily: 'Monaco, Consolas, "Courier New", monospace',
+                color: darkMode ? '#ff6b6b' : '#d63384'
+              }}
+              {...props}
+            />
+          ),
+
+          blockquote: (props) => (
+            <blockquote
+              style={{
+                margin: 0,
+                paddingLeft: '1rem',
+                borderLeft: '3px solid #7d7da8',
+                backgroundColor: darkMode ? 'rgba(125, 125, 168, 0.1)' : 'rgba(125, 125, 168, 0.05)',
+                padding: '0.8rem',
+                borderRadius: '0 6px 6px 0',
+                marginBottom: '0.8rem',
+                fontStyle: 'italic',
+                color: darkMode ? '#e0e0e0' : '#555555',
+                lineHeight: 1.5
+              }}
+              {...props}
+            />
+          ),
+
+          table: (props) => (
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                marginBottom: '0.8rem',
+                backgroundColor: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                border: `1px solid ${darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`
+              }}
+              {...props}
+            />
+          ),
+
+          th: (props) => (
+            <th
+              style={{
+                padding: '0.8rem',
+                backgroundColor: darkMode ? 'rgba(125, 125, 168, 0.2)' : 'rgba(125, 125, 168, 0.1)',
+                color: darkMode ? '#ffffff' : '#1a1a1a',
+                fontWeight: 600,
+                textAlign: 'left',
+                borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'}`,
+                fontSize: '0.9rem'
+              }}
+              {...props}
+            />
+          ),
+
+          td: (props) => (
+            <td
+              style={{
+                padding: '0.8rem',
+                borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+                color: darkMode ? '#e0e0e0' : '#333333',
+                fontSize: '0.9rem',
+                lineHeight: 1.4
+              }}
+              {...props}
+            />
+          ),
+
+          hr: (props) => (
+            <hr
+              style={{
+                border: 'none',
+                height: '2px',
+                backgroundColor: darkMode ? 'rgba(125, 125, 168, 0.3)' : 'rgba(125, 125, 168, 0.2)',
+                margin: '1rem 0',
+                borderRadius: '1px'
+              }}
+              {...props}
+            />
+          )
+  };
+  _mdComponentsCache[key] = components;
+  return components;
+}
+
+// Message body, rendered as live markdown even while streaming. During the
+// stream we skip rehype-raw (the heaviest stage) and show a blinking caret;
+// once complete, the full pipeline runs so any raw HTML is honored.
+const MarkdownMessage = memo(function MarkdownMessage({ content, role, darkMode, fontSize, isStreaming }) {
+  const components = buildMdComponents(darkMode);
+  return (
+    <Box
+      sx={{
+        color: darkMode
+          ? (role === 'user' ? '#ffffff' : '#e0e0e0')
+          : (role === 'user' ? '#1a1a1a' : '#333333'),
+        fontFamily: 'Manrope',
+        fontWeight: role === 'user' ? 600 : 400,
+        fontSize,
+        lineHeight: 1.5,
+        '& p': { margin: 0, marginBottom: '0.8rem', lineHeight: 1.6, color: 'inherit' },
+        '& ul, & ol': { margin: 0, marginBottom: '0.8rem', paddingLeft: '1.5rem', color: 'inherit' },
+        '& li': { margin: 0, marginBottom: '0.4rem', lineHeight: 1.5, color: 'inherit' },
+        '& h1, & h2, & h3': { margin: 0, marginBottom: '0.5rem', marginTop: '0.8rem', color: 'inherit' },
+        '& strong': { fontWeight: 600, color: 'inherit' },
+        '& em': { fontStyle: 'italic', color: 'inherit' },
+        ...(isStreaming ? {
+          '& > *:last-child::after': {
+            content: '""',
+            display: 'inline-block',
+            width: '2px',
+            height: '1em',
+            marginLeft: '2px',
+            verticalAlign: 'text-bottom',
+            backgroundColor: darkMode ? '#e0e0e0' : '#7d7da8',
+            animation: 'tvCaret 1s steps(1) infinite',
+          },
+          '@keyframes tvCaret': { '0%, 50%': { opacity: 1 }, '50.01%, 100%': { opacity: 0 } },
+        } : {}),
+      }}
+    >
+      <ReactMarkdown
+        remarkPlugins={MD_REMARK}
+        rehypePlugins={isStreaming ? MD_REHYPE_NONE : MD_REHYPE}
+        components={components}
+      >
+        {stripMeta(content)}
+      </ReactMarkdown>
+    </Box>
+  );
+});
 
 
 import Logo from './assets/STEM CARE-03.png'
@@ -192,6 +482,48 @@ function DynamicDepthOfField({ isAIResponding = false }) {
   )
 }
 
+// The 3D scene depends only on loading / darkMode / reducedMotion / isMobile —
+// never on the chat messages. Memoizing it keeps every streamed character update
+// (which re-renders App) from re-rendering the whole Three.js + postprocessing
+// tree, which is what triggered the EffectComposer "max update depth" loop and
+// starved the typewriter. R3F drives its own animation loop, so the scene keeps
+// moving smoothly while only the chat text re-renders.
+const Scene = memo(function Scene({ loading, darkMode, prefersReducedMotion, isMobile }) {
+  return (
+    <Canvas
+      camera={{ position: [0, 0, 5], fov: isMobile ? 55 : 50 }}
+      gl={{
+        alpha: true,
+        antialias: true,
+        toneMapping: THREE.ACESFilmicToneMapping,
+        powerPreference: "high-performance"
+      }}
+      shadows
+      dpr={[1, 2]}
+    >
+      <color attach="background" args={[darkMode ? "#1a1a1a" : "#dfe4ea"]} />
+      <ambientLight intensity={0.3} />
+      <directionalLight position={[5, 5, 5]} intensity={0.4} castShadow />
+      <Environment preset="sunset" background={false} />
+      <CellCameraRig isAIResponding={loading} reducedMotion={prefersReducedMotion} />
+      <Membrane isAIResponding={loading} reducedMotion={prefersReducedMotion} />
+      <Nucleus isAIResponding={loading} reducedMotion={prefersReducedMotion} />
+      <AdaptiveDpr />
+      <EffectComposer>
+        <Bloom
+          intensity={0.15}
+          luminanceThreshold={0.7}
+          luminanceSmoothing={0.4}
+          mipmapBlur={true}
+          resolutionX={512}
+          resolutionY={512}
+        />
+        <DynamicDepthOfField isAIResponding={loading} />
+      </EffectComposer>
+    </Canvas>
+  );
+});
+
 
 const TABS = {
   CRIO: 0,
@@ -317,9 +649,20 @@ export default function App() {
 
 
 
+  // Stick-to-bottom auto-scroll: follow the stream only while the user is at
+  // (or near) the bottom; if they scroll up to re-read, don't yank them back.
+  const stickToBottomRef = useRef(true)
+
+  const handleChatScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  }
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    const el = scrollRef.current
+    if (el && stickToBottomRef.current) {
+      el.scrollTop = el.scrollHeight
     }
   }, [messages])
 
@@ -436,6 +779,7 @@ const handleSubmit = async () => {
   
   const newMessages = [...messages, userMessage];
   setMessages(newMessages);
+  stickToBottomRef.current = true; // sending always snaps to the newest message
   setInput('');
   setLoading(true);
   setTyping(true);
@@ -482,35 +826,95 @@ const handleSubmit = async () => {
     };
     setMessages([...newMessages, assistantMessage]);
 
-    // 2) buffer + flush temporizado
-    let fullText = '';
-    let buffer = '';
-    const FLUSH_EVERY_MS = 45; // ajusta a 30–45ms para "vibe ChatGPT"
-    const flush = () => {
-      if (!buffer) return;
-      fullText += buffer;
-      buffer = '';
+    // 2) typewriter: the network fills `received`; a requestAnimationFrame loop
+    // reveals it at an even, time-based pace (chars/second, not chars/tick) so
+    // the text types smoothly regardless of how bursty the network delivery is.
+    // Using rAF instead of setTimeout keeps updates aligned to the browser's
+    // paint and prevents callbacks from piling up when a frame runs long.
+    let received = '';
+    let shown = 0;
+    let streamDone = false;
+    let finishReveal;
+    const drained = new Promise((r) => { finishReveal = r; });
+
+    const CPS = 90;       // steady typing speed (characters per second)
+    const CATCHUP = 260;  // if we trail the model by more than this, speed up
+    let lastTs = performance.now();
+    let rafId = 0;
+    let settled = false;
+
+    // rAF is paused while the tab is hidden, so a reveal still in flight when the
+    // user switches away would never finish — leaving `drained` unresolved and
+    // `loading` stuck true, which locks the composer for the rest of the session.
+    // Flushing the remaining text resolves it without waiting for another frame.
+    const flushReveal = () => {
+      if (settled) return;
+      settled = true;
+      cancelAnimationFrame(rafId);
+      document.removeEventListener('visibilitychange', onVisibility);
+      shown = received.length;
+      setTyping(false);
       setMessages(prev => {
         const updated = [...prev];
-        updated[updated.length - 1] = { 
-          ...updated[updated.length - 1], 
-          content: fullText 
-        };
+        updated[updated.length - 1] = { ...updated[updated.length - 1], content: received };
         return updated;
       });
+      finishReveal();
     };
-    const timer = setInterval(flush, FLUSH_EVERY_MS);
+
+    const onVisibility = () => { if (document.hidden && streamDone) flushReveal(); };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    const revealStep = (now) => {
+      const dt = Math.min(now - lastTs, 200); // clamp after a long/background frame
+      lastTs = now;
+      if (shown < received.length) {
+        const behind = received.length - shown;
+        // steady pace, but accelerate smoothly when the backlog is large so the
+        // tail never drags far behind the model once the network is done
+        const speed = behind > CATCHUP ? CPS * (behind / CATCHUP) : CPS;
+        const advance = document.hidden
+          ? behind // tab not visible: skip the animation
+          : Math.max(1, Math.round((speed * dt) / 1000));
+        shown = Math.min(received.length, shown + advance);
+        setTyping(false); // first visible text: hand off from the dots
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            content: received.slice(0, shown),
+          };
+          return updated;
+        });
+      }
+      if (streamDone && shown >= received.length) { flushReveal(); return; }
+      rafId = requestAnimationFrame(revealStep);
+    };
+    rafId = requestAnimationFrame(revealStep);
 
     // 3) leer el stream y sólo llenar el buffer
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        received += decoder.decode(value, { stream: true });
+      }
+      received += decoder.decode(); // flush a trailing split multi-byte char (á, ñ, …)
+    } catch (err) {
+      // stop typing; the outer catch reports the error
+      settled = true;
+      cancelAnimationFrame(rafId);
+      document.removeEventListener('visibilitychange', onVisibility);
+      finishReveal(); // never leave `drained` pending — it gates setLoading(false)
+      throw err;
+    } finally {
+      streamDone = true;
+      // Already hidden: rAF is paused, so finish the reveal directly.
+      if (document.hidden) flushReveal();
     }
 
-    // 4) flush final
-    clearInterval(timer);
-    flush();
+    // 4) wait for the reveal to finish typing out the tail
+    await drained;
 
     // 5) agent may have proposed write actions awaiting human approval
     if (AGENT_ENABLED && agentSessionRef.current) {
@@ -550,10 +954,13 @@ const handleSubmit = async () => {
         body: JSON.stringify({ approvalId, decision, sessionId: agentSessionRef.current }),
       });
       const j = await res.json().catch(() => ({}));
-      setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
+      // Only drop the card once the server actually recorded the decision —
+      // otherwise a failed call hides an approval that is still pending.
+      const settled = res.ok && (j.status === 'approved' || j.status === 'rejected');
+      if (settled) setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
 
       let text;
-      if (decision === 'reject') {
+      if (decision === 'reject' && res.ok && j.status === 'rejected') {
         text = currentLanguage === 'es' ? 'Solicitud cancelada.' : 'Request cancelled.';
       } else if (res.ok && j.status === 'approved') {
         text = currentLanguage === 'es'
@@ -1019,44 +1426,17 @@ const renderForm = () => {
 
 
 
-      <Canvas
-        // camera={{ position: [0, 0, 5], fov: 50 }}
-        camera={{ position: [0, 0, 5], fov: isMobile ? 55 : 50 }}
-        gl={{ 
-          alpha: true, 
-          antialias: true, 
-          toneMapping: THREE.ACESFilmicToneMapping,
-          powerPreference: "high-performance"
-        }}
-        shadows
-        dpr={[1, 2]}
-      >
-        <color attach="background" args={[darkMode ? "#1a1a1a" : "#dfe4ea"]} />
-        <ambientLight intensity={0.3} />
-        <directionalLight position={[5, 5, 5]} intensity={0.4} castShadow />
-        <Environment preset="sunset" background={false} />
-        <CellCameraRig isAIResponding={loading} reducedMotion={prefersReducedMotion} />
-        <Membrane isAIResponding={loading} reducedMotion={prefersReducedMotion} />
-        {/* <GlowRing /> */}
-        <Nucleus isAIResponding={loading} reducedMotion={prefersReducedMotion} />
-        {/* <Cytoplasm isAIResponding={loading} /> */}
-        <AdaptiveDpr />
-        <EffectComposer>
-          <Bloom 
-            intensity={0.15} 
-            luminanceThreshold={0.7} 
-            luminanceSmoothing={0.4}
-            mipmapBlur={true}
-            resolutionX={512}
-            resolutionY={512}
-          />
-          <DynamicDepthOfField isAIResponding={loading} />
-        </EffectComposer>
-      </Canvas>
+      <Scene
+        loading={loading}
+        darkMode={darkMode}
+        prefersReducedMotion={prefersReducedMotion}
+        isMobile={isMobile}
+      />
 
       <Collapse in={hasConversation} timeout={300} unmountOnExit>
         <Box
           ref={scrollRef}
+          onScroll={handleChatScroll}
           sx={{
             position:'fixed',
             left:'50%',
@@ -1085,7 +1465,7 @@ const renderForm = () => {
   const mt = i === 0 ? 0 : (prevRole && prevRole !== m.role ? 2 : 1); // 32px vs 16px
 
       return (
-        <Box key={i} data-message-box={m.content} sx={{ 
+        <Box key={i} sx={{
           mt,
           mb: 1,
           p: 1.5,
@@ -1098,286 +1478,14 @@ const renderForm = () => {
             : `1px solid ${darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
           transition: 'all 0.2s ease-in-out'
         }}>
-        <Box
-          data-message-content={m.content}
-          sx={{
-              color: darkMode 
-                ? (m.role === 'user' ? '#ffffff' : '#e0e0e0')
-                : (m.role === 'user' ? '#1a1a1a' : '#333333'),
-            fontFamily: 'Manrope',
-            fontWeight: m.role === 'user' ? 600 : 400,
-            fontSize: bodyFontSize,
-            lineHeight: 1.5,
-        '& p': { 
-          margin: 0,
-          marginBottom: '0.8rem',
-          lineHeight: 1.6,
-          color: 'inherit'
-        },
-        '& ul, & ol': { 
-          margin: 0,
-          marginBottom: '0.8rem',
-          paddingLeft: '1.5rem',
-          color: 'inherit'
-        },
-        '& li': { 
-          margin: 0,
-          marginBottom: '0.4rem',
-          lineHeight: 1.5,
-          color: 'inherit'
-        },
-        '& h1, & h2, & h3': {
-          margin: 0,
-          marginBottom: '0.5rem',
-          marginTop: '0.8rem',
-          color: 'inherit'
-        },
-        '& strong': {
-          fontWeight: 600,
-          color: 'inherit'
-        },
-        '& em': {
-          fontStyle: 'italic',
-          color: 'inherit'
-        }
-      }}
-    >
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw]}
-        components={{
-          // Enhanced paragraph styling
-          p: (props) => (
-            <p 
-              style={{ 
-                margin: 0, 
-                lineHeight: 1.6, 
-                marginBottom: '0.8rem',
-                color: darkMode ? '#e0e0e0' : '#333333'
-              }} 
-              {...props} 
-            />
-          ),
-          
-          // Enhanced list styling
-          ul: (props) => (
-            <ul 
-              style={{ 
-                margin: 0, 
-                paddingLeft: '1.5rem', 
-                lineHeight: 1.6, 
-                marginBottom: '0.8rem',
-                color: darkMode ? '#e0e0e0' : '#333333'
-              }} 
-              {...props} 
-            />
-          ),
-          
-          ol: (props) => (
-            <ol 
-              style={{ 
-                margin: 0, 
-                paddingLeft: '1.5rem', 
-                lineHeight: 1.6, 
-                marginBottom: '0.8rem',
-                color: darkMode ? '#e0e0e0' : '#333333'
-              }} 
-              {...props} 
-            />
-          ),
-          
-          li: (props) => (
-            <li 
-              style={{ 
-                margin: 0, 
-                marginBottom: '0.4rem',
-                lineHeight: 1.5,
-                color: darkMode ? '#e0e0e0' : '#333333'
-              }} 
-              {...props} 
-            />
-          ),
-          
-          // Enhanced heading styling
-          h1: (props) => (
-            <h1 
-              style={{ 
-                margin: 0, 
-                fontSize: '1.3rem', 
-                fontWeight: 700, 
-                marginBottom: '0.6rem',
-                marginTop: '0.8rem',
-                color: darkMode ? '#ffffff' : '#1a1a1a',
-                borderBottom: `2px solid ${darkMode ? '#7d7da8' : '#7d7da8'}`,
-                paddingBottom: '0.3rem',
-                lineHeight: 1.3
-              }} 
-              {...props} 
-            />
-          ),
-          
-          h2: (props) => (
-            <h2 
-              style={{ 
-                margin: 0, 
-                fontSize: '1.2rem', 
-                fontWeight: 600, 
-                marginBottom: '0.5rem',
-                marginTop: '0.7rem',
-                color: darkMode ? '#ffffff' : '#1a1a1a',
-                lineHeight: 1.3
-              }} 
-              {...props} 
-            />
-          ),
-          
-          h3: (props) => (
-            <h3 
-              style={{ 
-                margin: 0, 
-                fontSize: '1.1rem', 
-                fontWeight: 600, 
-                marginBottom: '0.4rem',
-                marginTop: '0.6rem',
-                color: darkMode ? '#ffffff' : '#1a1a1a',
-                lineHeight: 1.3
-              }} 
-              {...props} 
-            />
-          ),
-          
-          // Enhanced link styling
-          a: (props) => (
-            <a 
-              style={{ 
-                textDecoration: 'underline',
-                color: darkMode ? '#7d7da8' : '#7d7da8',
-                fontWeight: 500,
-                transition: 'color 0.2s ease'
-              }} 
-              {...props} 
-            />
-          ),
-          
-          // Enhanced strong/bold styling
-          strong: (props) => (
-            <strong 
-              style={{ 
-                fontWeight: 600,
-                color: darkMode ? '#ffffff' : '#1a1a1a'
-              }} 
-              {...props} 
-            />
-          ),
-          
-          // Enhanced emphasis/italic styling
-          em: (props) => (
-            <em 
-              style={{ 
-                fontStyle: 'italic',
-                color: darkMode ? '#b0b0b0' : '#666666'
-              }} 
-              {...props} 
-            />
-          ),
-          
-          // Enhanced code styling
-          code: (props) => (
-            <code 
-              style={{ 
-                backgroundColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                padding: '0.2rem 0.4rem',
-                borderRadius: '4px',
-                fontSize: '0.9em',
-                fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-                color: darkMode ? '#ff6b6b' : '#d63384'
-              }} 
-              {...props} 
-            />
-          ),
-          
-          // Enhanced blockquote styling
-          blockquote: (props) => (
-            <blockquote 
-              style={{ 
-                margin: 0,
-                paddingLeft: '1rem',
-                borderLeft: `3px solid ${darkMode ? '#7d7da8' : '#7d7da8'}`,
-                backgroundColor: darkMode ? 'rgba(125, 125, 168, 0.1)' : 'rgba(125, 125, 168, 0.05)',
-                padding: '0.8rem',
-                borderRadius: '0 6px 6px 0',
-                marginBottom: '0.8rem',
-                fontStyle: 'italic',
-                color: darkMode ? '#e0e0e0' : '#555555',
-                lineHeight: 1.5
-              }} 
-              {...props} 
-            />
-          ),
-          
-          // Enhanced table styling
-          table: (props) => (
-            <table 
-              style={{ 
-                width: '100%',
-                borderCollapse: 'collapse',
-                marginBottom: '0.8rem',
-                backgroundColor: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                border: `1px solid ${darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`
-              }} 
-              {...props} 
-            />
-          ),
-          
-          th: (props) => (
-            <th 
-              style={{ 
-                padding: '0.8rem',
-                backgroundColor: darkMode ? 'rgba(125, 125, 168, 0.2)' : 'rgba(125, 125, 168, 0.1)',
-                color: darkMode ? '#ffffff' : '#1a1a1a',
-                fontWeight: 600,
-                textAlign: 'left',
-                borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'}`,
-                fontSize: '0.9rem'
-              }} 
-              {...props} 
-            />
-          ),
-          
-          td: (props) => (
-            <td 
-              style={{ 
-                padding: '0.8rem',
-                borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
-                color: darkMode ? '#e0e0e0' : '#333333',
-                fontSize: '0.9rem',
-                lineHeight: 1.4
-              }} 
-              {...props} 
-            />
-          ),
-          
-          // Enhanced horizontal rule styling
-          hr: (props) => (
-            <hr 
-              style={{ 
-                border: 'none',
-                height: '2px',
-                backgroundColor: darkMode ? 'rgba(125, 125, 168, 0.3)' : 'rgba(125, 125, 168, 0.2)',
-                margin: '1rem 0',
-                borderRadius: '1px'
-              }} 
-              {...props} 
-            />
-          )
-        }}
-      >
-        {m.content}
-      </ReactMarkdown>
-    </Box>
-      
+        <MarkdownMessage
+          content={m.content}
+          role={m.role}
+          darkMode={darkMode}
+          fontSize={bodyFontSize}
+          isStreaming={loading && m.role === 'assistant' && i === messages.length - 1}
+        />
+
       {/* Timestamp and Action Buttons */}
       {m.timestamp && (
         <Box

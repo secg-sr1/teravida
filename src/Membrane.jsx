@@ -1,78 +1,71 @@
 // Membrane.jsx
-import { useRef } from 'react'
+import { useRef, useMemo, useCallback } from 'react'
 import { useFrame } from '@react-three/fiber'
-import * as THREE from 'three'
 
-export default function Membrane({ isAIResponding = false }) {
+// Wave deformation runs on the GPU via onBeforeCompile instead of
+// mutating ~1700 vertices on the CPU every frame.
+export default function Membrane({ isAIResponding = false, reducedMotion = false }) {
   const meshRef = useRef()
-  const basePositions = useRef([])
 
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime()
+  const uniforms = useMemo(() => ({
+    uTime: { value: 0 },
+    uWaveSpeed: { value: 2 },
+    uWaveIntensity: { value: 0.02 },
+  }), [])
+
+  const onBeforeCompile = useCallback((shader) => {
+    shader.uniforms.uTime = uniforms.uTime
+    shader.uniforms.uWaveSpeed = uniforms.uWaveSpeed
+    shader.uniforms.uWaveIntensity = uniforms.uWaveIntensity
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        uniform float uTime;
+        uniform float uWaveSpeed;
+        uniform float uWaveIntensity;`
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        float waveOffset = sin(uTime * uWaveSpeed + (position.x + position.y + position.z) * 3.0) * uWaveIntensity;
+        transformed += position * waveOffset;`
+      )
+  }, [uniforms])
+
+  useFrame((_, delta) => {
     if (!meshRef.current) return
+    uniforms.uTime.value += delta
 
-    // Enhanced rotation during AI response
-    const rotationSpeed = isAIResponding ? 0.2 : 0.1
-    meshRef.current.rotation.y = t * rotationSpeed
-    
-    // More pronounced scaling during AI response
-    const scaleIntensity = isAIResponding ? 0.04 : 0.02
+    const lerp = Math.min(1, delta * 2)
+    const targetSpeed = isAIResponding ? 3 : 2
+    const targetIntensity = reducedMotion ? 0.004 : (isAIResponding ? 0.03 : 0.02)
+    uniforms.uWaveSpeed.value += (targetSpeed - uniforms.uWaveSpeed.value) * lerp
+    uniforms.uWaveIntensity.value += (targetIntensity - uniforms.uWaveIntensity.value) * lerp
+
+    if (reducedMotion) return
+
+    const t = uniforms.uTime.value
+    meshRef.current.rotation.y += delta * (isAIResponding ? 0.2 : 0.1)
     const scaleSpeed = isAIResponding ? 2.5 : 1.5
+    const scaleIntensity = isAIResponding ? 0.04 : 0.02
     const scale = 1 + Math.sin(t * scaleSpeed) * scaleIntensity
     meshRef.current.scale.set(scale, scale, scale)
-
-    const geom = meshRef.current.geometry
-    const positions = geom.attributes.position
-
-    if (!basePositions.current.length) {
-      basePositions.current = positions.array.slice()
-    }
-
-    for (let i = 0; i < positions.count; i++) {
-      const i3 = i * 3
-      const x = basePositions.current[i3]
-      const y = basePositions.current[i3 + 1]
-      const z = basePositions.current[i3 + 2]
-      
-      // Enhanced vertex animation during AI response
-      const waveSpeed = isAIResponding ? 3 : 2
-      const waveIntensity = isAIResponding ? 0.03 : 0.02
-      const offset = Math.sin(t * waveSpeed + x * 3 + y * 3 + z * 3) * waveIntensity
-      positions.setXYZ(i, x + x * offset, y + y * offset, z + z * offset)
-    }
-    positions.needsUpdate = true
   })
 
   return (
     <mesh ref={meshRef} renderOrder={2}>
-    <icosahedronGeometry args={[1.5, 12]} />
-    {/* <meshPhysicalMaterial
-        transmission={1}        // ⬅️ Allow light through
-        roughness={0.1}
-        thickness={1.0}
-        clearcoat={1}
-        reflectivity={0.01}
+      <icosahedronGeometry args={[1.5, 12]} />
+      <meshStandardMaterial
         transparent
-        opacity={0.04}          // ⬅️ Slightly higher for subtle volume but see-through
-        metalness={0.2}
-        ior={1.1}
+        opacity={0.15}
+        roughness={0.1}
+        metalness={0.05}
         depthWrite={false}
-        color="#c0e6ff"
-        sheen={1.0}
-        sheenColor={new THREE.Color('#e6f4ff')}
-        /> */}
-
-        <meshStandardMaterial
-          transparent
-          opacity={0.15}
-          roughness={0.1}
-          metalness={0.05}
-          depthWrite={false}
-          emissive="#f6b0ffff"
-          emissiveIntensity={0.1}
-        />
-
-
+        emissive="#f6b0ff"
+        emissiveIntensity={0.1}
+        onBeforeCompile={onBeforeCompile}
+      />
     </mesh>
   )
 }

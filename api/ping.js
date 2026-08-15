@@ -1,4 +1,4 @@
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   console.log('ping hit', { method: req.method });
   res.status(200).json({ ok: true, method: req.method });
-};
+}

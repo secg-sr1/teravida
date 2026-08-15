@@ -8,7 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-# dist
+# Build output — Vercel runs `npm run build` and serves its own output, so a
+# committed dist/ is never deployed and only goes stale.
+dist
 dist-ssr
 *.local
 
@@ -30,9 +32,6 @@ scripts/.cache
 .env
 *.env
 **/.env
-
-# build
-# dist/
 
 # server-only local stuff
 src/server/.env
