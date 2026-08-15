@@ -787,6 +787,9 @@ const handleSubmit = async () => {
   // Increment user question count
   setUserQuestionCount(prev => prev + 1);
 
+  // Hoisted so the error path can target the streaming bubble if one was created.
+  let streamId = null;
+
   try {
     const res = AGENT_ENABLED
       ? await fetch('/api/agents/concierge', {
@@ -818,13 +821,27 @@ const handleSubmit = async () => {
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
 
-    // 1) placeholder del asistente with timestamp
-    const assistantMessage = { 
-      role: 'assistant', 
-      content: '', 
-      timestamp: new Date().toISOString() 
+    // 1) placeholder del asistente with timestamp.
+    // `streamId` gives this bubble a stable identity: approval confirmations are
+    // appended asynchronously, so the streaming message is not reliably last and
+    // writing to messages[length-1] would overwrite whatever landed after it.
+    streamId = `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const assistantMessage = {
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString(),
+      streamId,
     };
     setMessages([...newMessages, assistantMessage]);
+
+    // Writes to the streaming bubble by identity, leaving any later message alone.
+    const writeStreamed = (text) => setMessages(prev => {
+      const i = prev.findIndex(m => m.streamId === streamId);
+      if (i === -1) return prev; // bubble no longer present; nothing to update
+      const updated = [...prev];
+      updated[i] = { ...updated[i], content: text };
+      return updated;
+    });
 
     // 2) typewriter: the network fills `received`; a requestAnimationFrame loop
     // reveals it at an even, time-based pace (chars/second, not chars/tick) so
@@ -854,11 +871,7 @@ const handleSubmit = async () => {
       document.removeEventListener('visibilitychange', onVisibility);
       shown = received.length;
       setTyping(false);
-      setMessages(prev => {
-        const updated = [...prev];
-        updated[updated.length - 1] = { ...updated[updated.length - 1], content: received };
-        return updated;
-      });
+      writeStreamed(received);
       finishReveal();
     };
 
@@ -878,14 +891,7 @@ const handleSubmit = async () => {
           : Math.max(1, Math.round((speed * dt) / 1000));
         shown = Math.min(received.length, shown + advance);
         setTyping(false); // first visible text: hand off from the dots
-        setMessages(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            ...updated[updated.length - 1],
-            content: received.slice(0, shown),
-          };
-          return updated;
-        });
+        writeStreamed(received.slice(0, shown));
       }
       if (streamDone && shown >= received.length) { flushReveal(); return; }
       rafId = requestAnimationFrame(revealStep);
@@ -931,13 +937,20 @@ const handleSubmit = async () => {
     
   } catch (error) {
     console.error('Chat error:', error);
-    setMessages([...newMessages, {
-      role: 'assistant',
-      content: currentLanguage === 'es'
-        ? 'Lo siento, hubo un error al procesar tu consulta. Por favor, intenta nuevamente.'
-        : 'Sorry, there was an error processing your question. Please try again.',
-      timestamp: new Date().toISOString()
-    }]);
+    const errorText = currentLanguage === 'es'
+      ? 'Lo siento, hubo un error al procesar tu consulta. Por favor, intenta nuevamente.'
+      : 'Sorry, there was an error processing your question. Please try again.';
+    // Replace the streaming bubble in place when one exists, rather than rebuilding
+    // from `newMessages` — that discarded anything appended while the stream ran
+    // (e.g. an approval confirmation).
+    setMessages(prev => {
+      const i = streamId ? prev.findIndex(m => m.streamId === streamId) : -1;
+      const errorMessage = { role: 'assistant', content: errorText, timestamp: new Date().toISOString() };
+      if (i === -1) return [...prev, errorMessage];
+      const updated = [...prev];
+      updated[i] = { ...updated[i], ...errorMessage };
+      return updated;
+    });
   }
 
   setLoading(false);

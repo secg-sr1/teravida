@@ -91,7 +91,9 @@ create table if not exists agent_approvals (
   session_id      uuid        not null references agent_sessions(id) on delete cascade,
   tool_call_id    bigint      references agent_tool_calls(id) on delete set null,
   proposed_action jsonb       not null,
-  status          text        not null default 'pending', -- pending|approved|rejected
+  -- pending|executing|approved|rejected|error. 'executing' is the transient claim
+  -- taken before a write tool runs, so a retried decision cannot execute it twice.
+  status          text        not null default 'pending',
   decided_by      text,
   decided_at      timestamptz,
   created_at      timestamptz not null default now()
