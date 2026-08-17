@@ -832,7 +832,10 @@ const handleSubmit = async () => {
       timestamp: new Date().toISOString(),
       streamId,
     };
-    setMessages([...newMessages, assistantMessage]);
+    // Append functionally rather than rebuilding from `newMessages`: that snapshot
+    // predates `await fetch`, so anything appended while the request was in flight
+    // (an approval confirmation, for instance) would be silently dropped here.
+    setMessages(prev => [...prev, assistantMessage]);
 
     // Writes to the streaming bubble by identity, leaving any later message alone.
     const writeStreamed = (text) => setMessages(prev => {
@@ -967,20 +970,34 @@ const handleSubmit = async () => {
         body: JSON.stringify({ approvalId, decision, sessionId: agentSessionRef.current }),
       });
       const j = await res.json().catch(() => ({}));
-      // Only drop the card once the server actually recorded the decision —
-      // otherwise a failed call hides an approval that is still pending.
-      const settled = res.ok && (j.status === 'approved' || j.status === 'rejected');
-      if (settled) setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
+      // decide() reports the row's real state, which is a wider set than
+      // approved/rejected: 'executing' means another request is mid-flight,
+      // 'error'/'unavailable' mean it will never complete. Treating any of those
+      // as a generic failure told the user to retry something already succeeding.
+      const status = res.ok ? j.status : 'http_error';
+      const es = currentLanguage === 'es';
+
+      // Drop the card for every terminal state; keep it only while still actionable.
+      const terminal = ['approved', 'rejected', 'error', 'unavailable', 'forbidden'].includes(status);
+      if (terminal) setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
 
       let text;
-      if (decision === 'reject' && res.ok && j.status === 'rejected') {
-        text = currentLanguage === 'es' ? 'Solicitud cancelada.' : 'Request cancelled.';
-      } else if (res.ok && j.status === 'approved') {
-        text = currentLanguage === 'es'
+      if (status === 'approved') {
+        text = es
           ? '✅ Solicitud confirmada. El equipo de Stem Care recibió tu información.'
           : '✅ Request confirmed. The Stem Care team has received your information.';
+      } else if (status === 'rejected') {
+        text = es ? 'Solicitud cancelada.' : 'Request cancelled.';
+      } else if (status === 'executing') {
+        text = es
+          ? 'Tu solicitud se está procesando. Un momento, por favor.'
+          : 'Your request is being processed. One moment, please.';
+      } else if (status === 'unavailable') {
+        text = es
+          ? '⚠️ No pudimos registrar tu solicitud. Por favor usa el formulario de contacto.'
+          : '⚠️ We could not register your request. Please use the contact form.';
       } else {
-        text = currentLanguage === 'es'
+        text = es
           ? '⚠️ No se pudo procesar la solicitud. Por favor intenta de nuevo.'
           : '⚠️ Could not process the request. Please try again.';
       }
