@@ -857,9 +857,9 @@ const handleSubmit = async () => {
     let finishReveal;
     const drained = new Promise((r) => { finishReveal = r; });
 
-    const CPS = 70;          // steady typing speed (characters per second)
+    const CPS = 60;          // steady typing speed (characters per second)
     const CATCHUP = 260;     // backlog beyond which we start catching up
-    const MAX_CATCHUP = 3;   // hard ceiling on the catch-up multiplier
+    const MAX_CATCHUP = 2.5; // hard ceiling on the catch-up multiplier
     let budget = 0;          // fractional characters carried between frames
     let lastTs = performance.now();
     let rafId = 0;
