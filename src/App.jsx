@@ -857,8 +857,10 @@ const handleSubmit = async () => {
     let finishReveal;
     const drained = new Promise((r) => { finishReveal = r; });
 
-    const CPS = 90;       // steady typing speed (characters per second)
-    const CATCHUP = 260;  // if we trail the model by more than this, speed up
+    const CPS = 70;          // steady typing speed (characters per second)
+    const CATCHUP = 260;     // backlog beyond which we start catching up
+    const MAX_CATCHUP = 3;   // hard ceiling on the catch-up multiplier
+    let budget = 0;          // fractional characters carried between frames
     let lastTs = performance.now();
     let rafId = 0;
     let settled = false;
@@ -886,15 +888,33 @@ const handleSubmit = async () => {
       lastTs = now;
       if (shown < received.length) {
         const behind = received.length - shown;
-        // steady pace, but accelerate smoothly when the backlog is large so the
-        // tail never drags far behind the model once the network is done
-        const speed = behind > CATCHUP ? CPS * (behind / CATCHUP) : CPS;
-        const advance = document.hidden
-          ? behind // tab not visible: skip the animation
-          : Math.max(1, Math.round((speed * dt) / 1000));
-        shown = Math.min(received.length, shown + advance);
-        setTyping(false); // first visible text: hand off from the dots
-        writeStreamed(received.slice(0, shown));
+        // Catch up when the backlog grows, but along a square root and against a
+        // hard ceiling. The previous linear, uncapped ramp meant a fully buffered
+        // answer typed at CPS * (behind / CATCHUP) — several hundred chars/sec on
+        // a long reply, which reads as an instant dump rather than typing.
+        const speed = behind > CATCHUP
+          ? CPS * Math.min(Math.sqrt(behind / CATCHUP), MAX_CATCHUP)
+          : CPS;
+
+        let advance;
+        if (document.hidden) {
+          advance = behind; // tab not visible: skip the animation
+          budget = 0;
+        } else {
+          // Carry the fraction between frames instead of rounding each one. The old
+          // Math.max(1, round(...)) forced at least one character per frame, which
+          // put a floor of ~60 chars/sec on a 60Hz display and made any CPS below
+          // that unreachable — and quantised the pace at every speed.
+          budget += (speed * dt) / 1000;
+          advance = Math.floor(budget);
+          budget -= advance;
+        }
+
+        if (advance > 0) {
+          shown = Math.min(received.length, shown + advance);
+          setTyping(false); // first visible text: hand off from the dots
+          writeStreamed(received.slice(0, shown));
+        }
       }
       if (streamDone && shown >= received.length) { flushReveal(); return; }
       rafId = requestAnimationFrame(revealStep);
