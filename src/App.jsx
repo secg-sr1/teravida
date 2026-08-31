@@ -36,6 +36,8 @@ import ScheduleIcon from '@mui/icons-material/Schedule';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import CloseIcon from '@mui/icons-material/Close';
+import RemoveIcon from '@mui/icons-material/Remove';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import SettingsIcon from '@mui/icons-material/Settings';
 import {
@@ -621,6 +623,17 @@ export default function App() {
   
   // if you keep a system message, ignore it for the check
   const hasConversation = messages.some(m => m.role === 'user' || m.role === 'assistant');
+  const [chatMinimized, setChatMinimized] = useState(false);
+
+  // Close clears the transcript (and its sessionStorage copy), which drops
+  // hasConversation and unmounts the panel. Minimize only collapses the body.
+  const closeChat = () => {
+    setMessages([]);
+    setPendingApprovals([]);
+    setChatMinimized(false);
+    agentSessionRef.current = null;
+    try { sessionStorage.removeItem('teravida-chat'); } catch { /* storage unavailable */ }
+  };
 
 
   const theme = useTheme()
@@ -860,7 +873,9 @@ const handleSubmit = async () => {
     const CPS = 60;          // steady typing speed (characters per second)
     const CATCHUP = 260;     // backlog beyond which we start catching up
     const MAX_CATCHUP = 2.5; // hard ceiling on the catch-up multiplier
+    const SMOOTHING = 0.08;  // per-frame easing toward the target speed (~0.2s)
     let budget = 0;          // fractional characters carried between frames
+    let smoothed = CPS;      // eased speed, so pace changes are gradual
     let lastTs = performance.now();
     let rafId = 0;
     let settled = false;
@@ -892,9 +907,14 @@ const handleSubmit = async () => {
         // hard ceiling. The previous linear, uncapped ramp meant a fully buffered
         // answer typed at CPS * (behind / CATCHUP) — several hundred chars/sec on
         // a long reply, which reads as an instant dump rather than typing.
-        const speed = behind > CATCHUP
+        const target = behind > CATCHUP
           ? CPS * Math.min(Math.sqrt(behind / CATCHUP), MAX_CATCHUP)
           : CPS;
+        // Ease toward the target rather than tracking the backlog instantly: each
+        // arriving chunk changes `behind` abruptly, and reading that raw made the
+        // pace step up and down. The filter turns those steps into a gentle ramp.
+        smoothed += (target - smoothed) * SMOOTHING;
+        const speed = smoothed;
 
         let advance;
         if (document.hidden) {
@@ -1485,21 +1505,18 @@ const renderForm = () => {
 
       <Collapse in={hasConversation} timeout={300} unmountOnExit>
         <Box
-          ref={scrollRef}
-          onScroll={handleChatScroll}
           sx={{
             position:'fixed',
             left:'50%',
             transform:'translateX(-50%)',
             bottom: (footerHeight + 6) + (isMobile ? 96 : 108), // ~dock height; adjust once
             width:'100%', maxWidth: chatMaxWidth,
-            maxHeight: isMobile ? '42vh' : '55vh',
-            overflowY:'auto',
+            overflow:'hidden', // keeps the header inside the rounded corners
             backdropFilter: loading ? 'blur(2px)' : 'blur(12px)',
             backgroundColor: darkMode 
               ? (loading ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.3)')
               : (loading ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.3)'),
-            borderRadius:2, p:2,
+            borderRadius:2,
             transition: 'all 0.3s ease-in-out',
             border: darkMode
               ? (loading ? '2px solid rgba(255,255,255,0.3)' : '1px solid rgba(255,255,255,0.1)')
@@ -1509,6 +1526,42 @@ const renderForm = () => {
               : (loading ? '0 0 20px rgba(255,255,255,0.2)' : '0 0 10px rgba(255,255,255,0.1)'),
           }}
         >
+          {/* Panel controls: minimize collapses the transcript, close clears it. */}
+          <Box sx={{
+            display:'flex', alignItems:'center', justifyContent:'flex-end', gap:0.25,
+            px:1, pt:0.5, pb: chatMinimized ? 0.5 : 0,
+          }}>
+            <IconButton
+              size="small"
+              onClick={() => setChatMinimized(v => !v)}
+              aria-label={chatMinimized
+                ? (currentLanguage === 'es' ? 'Expandir conversación' : 'Expand conversation')
+                : (currentLanguage === 'es' ? 'Minimizar conversación' : 'Minimize conversation')}
+              sx={{ color: darkMode ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)' }}
+            >
+              {chatMinimized ? <ExpandLessIcon fontSize="small" /> : <RemoveIcon fontSize="small" />}
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={closeChat}
+              aria-label={currentLanguage === 'es' ? 'Cerrar conversación' : 'Close conversation'}
+              sx={{ color: darkMode ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)' }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+
+          <Box
+            ref={scrollRef}
+            onScroll={handleChatScroll}
+            sx={{
+              maxHeight: chatMinimized ? 0 : (isMobile ? '42vh' : '55vh'),
+              opacity: chatMinimized ? 0 : 1,
+              overflowY: chatMinimized ? 'hidden' : 'auto',
+              transition: 'max-height 0.3s ease-in-out, opacity 0.2s ease-in-out',
+              px:2, pb:2,
+            }}
+          >
           {messages.map((m, i) => {
   const prevRole = i > 0 ? messages[i - 1].role : null;
   // more space when role changes (user↔assistant)
@@ -1698,6 +1751,7 @@ const renderForm = () => {
       </Box>
     ))}
 
+          </Box>
         </Box>
       </Collapse>
 
