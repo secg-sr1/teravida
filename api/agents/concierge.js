@@ -29,6 +29,7 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
   if (req.method !== 'POST') {
+    setCorsHeaders(req, res);
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
@@ -40,16 +41,19 @@ export default async function handler(req, res) {
 
     const { message, language = 'es', sessionId } = await readJson(req);
     if (!message || !String(message).trim()) {
+      setCorsHeaders(req, res);
       return res.status(400).json({ error: 'message is required' });
     }
 
+    // createSession returns null when Supabase is unavailable; the agent then
+    // runs stateless (no history, no approvals) instead of failing the request.
     const sid = sessionId || (await createSession(language));
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('X-Session-Id', sid);
+    if (sid) res.setHeader('X-Session-Id', sid);
     setCorsHeaders(req, res);
-    res.setHeader('Access-Control-Expose-Headers', 'X-Session-Id');
+    if (sid) res.setHeader('Access-Control-Expose-Headers', 'X-Session-Id');
     res.status(200);
 
     await runConciergeStream({
@@ -62,6 +66,7 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('concierge error:', err);
     if (!res.headersSent) {
+      setCorsHeaders(req, res);
       res.status(500).json({ error: 'Agent failed', detail: err?.message || String(err) });
     } else {
       res.end();

@@ -36,6 +36,8 @@ import ScheduleIcon from '@mui/icons-material/Schedule';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import CloseIcon from '@mui/icons-material/Close';
+import RemoveIcon from '@mui/icons-material/Remove';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import SettingsIcon from '@mui/icons-material/Settings';
 import {
@@ -621,6 +623,17 @@ export default function App() {
   
   // if you keep a system message, ignore it for the check
   const hasConversation = messages.some(m => m.role === 'user' || m.role === 'assistant');
+  const [chatMinimized, setChatMinimized] = useState(false);
+
+  // Close clears the transcript (and its sessionStorage copy), which drops
+  // hasConversation and unmounts the panel. Minimize only collapses the body.
+  const closeChat = () => {
+    setMessages([]);
+    setPendingApprovals([]);
+    setChatMinimized(false);
+    agentSessionRef.current = null;
+    try { sessionStorage.removeItem('teravida-chat'); } catch { /* storage unavailable */ }
+  };
 
 
   const theme = useTheme()
@@ -787,6 +800,9 @@ const handleSubmit = async () => {
   // Increment user question count
   setUserQuestionCount(prev => prev + 1);
 
+  // Hoisted so the error path can target the streaming bubble if one was created.
+  let streamId = null;
+
   try {
     const res = AGENT_ENABLED
       ? await fetch('/api/agents/concierge', {
@@ -818,13 +834,30 @@ const handleSubmit = async () => {
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
 
-    // 1) placeholder del asistente with timestamp
-    const assistantMessage = { 
-      role: 'assistant', 
-      content: '', 
-      timestamp: new Date().toISOString() 
+    // 1) placeholder del asistente with timestamp.
+    // `streamId` gives this bubble a stable identity: approval confirmations are
+    // appended asynchronously, so the streaming message is not reliably last and
+    // writing to messages[length-1] would overwrite whatever landed after it.
+    streamId = `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const assistantMessage = {
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString(),
+      streamId,
     };
-    setMessages([...newMessages, assistantMessage]);
+    // Append functionally rather than rebuilding from `newMessages`: that snapshot
+    // predates `await fetch`, so anything appended while the request was in flight
+    // (an approval confirmation, for instance) would be silently dropped here.
+    setMessages(prev => [...prev, assistantMessage]);
+
+    // Writes to the streaming bubble by identity, leaving any later message alone.
+    const writeStreamed = (text) => setMessages(prev => {
+      const i = prev.findIndex(m => m.streamId === streamId);
+      if (i === -1) return prev; // bubble no longer present; nothing to update
+      const updated = [...prev];
+      updated[i] = { ...updated[i], content: text };
+      return updated;
+    });
 
     // 2) typewriter: the network fills `received`; a requestAnimationFrame loop
     // reveals it at an even, time-based pace (chars/second, not chars/tick) so
@@ -837,8 +870,12 @@ const handleSubmit = async () => {
     let finishReveal;
     const drained = new Promise((r) => { finishReveal = r; });
 
-    const CPS = 90;       // steady typing speed (characters per second)
-    const CATCHUP = 260;  // if we trail the model by more than this, speed up
+    const CPS = 60;          // steady typing speed (characters per second)
+    const CATCHUP = 260;     // backlog beyond which we start catching up
+    const MAX_CATCHUP = 2.5; // hard ceiling on the catch-up multiplier
+    const SMOOTHING = 0.08;  // per-frame easing toward the target speed (~0.2s)
+    let budget = 0;          // fractional characters carried between frames
+    let smoothed = CPS;      // eased speed, so pace changes are gradual
     let lastTs = performance.now();
     let rafId = 0;
     let settled = false;
@@ -854,11 +891,7 @@ const handleSubmit = async () => {
       document.removeEventListener('visibilitychange', onVisibility);
       shown = received.length;
       setTyping(false);
-      setMessages(prev => {
-        const updated = [...prev];
-        updated[updated.length - 1] = { ...updated[updated.length - 1], content: received };
-        return updated;
-      });
+      writeStreamed(received);
       finishReveal();
     };
 
@@ -870,22 +903,38 @@ const handleSubmit = async () => {
       lastTs = now;
       if (shown < received.length) {
         const behind = received.length - shown;
-        // steady pace, but accelerate smoothly when the backlog is large so the
-        // tail never drags far behind the model once the network is done
-        const speed = behind > CATCHUP ? CPS * (behind / CATCHUP) : CPS;
-        const advance = document.hidden
-          ? behind // tab not visible: skip the animation
-          : Math.max(1, Math.round((speed * dt) / 1000));
-        shown = Math.min(received.length, shown + advance);
-        setTyping(false); // first visible text: hand off from the dots
-        setMessages(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            ...updated[updated.length - 1],
-            content: received.slice(0, shown),
-          };
-          return updated;
-        });
+        // Catch up when the backlog grows, but along a square root and against a
+        // hard ceiling. The previous linear, uncapped ramp meant a fully buffered
+        // answer typed at CPS * (behind / CATCHUP) — several hundred chars/sec on
+        // a long reply, which reads as an instant dump rather than typing.
+        const target = behind > CATCHUP
+          ? CPS * Math.min(Math.sqrt(behind / CATCHUP), MAX_CATCHUP)
+          : CPS;
+        // Ease toward the target rather than tracking the backlog instantly: each
+        // arriving chunk changes `behind` abruptly, and reading that raw made the
+        // pace step up and down. The filter turns those steps into a gentle ramp.
+        smoothed += (target - smoothed) * SMOOTHING;
+        const speed = smoothed;
+
+        let advance;
+        if (document.hidden) {
+          advance = behind; // tab not visible: skip the animation
+          budget = 0;
+        } else {
+          // Carry the fraction between frames instead of rounding each one. The old
+          // Math.max(1, round(...)) forced at least one character per frame, which
+          // put a floor of ~60 chars/sec on a 60Hz display and made any CPS below
+          // that unreachable — and quantised the pace at every speed.
+          budget += (speed * dt) / 1000;
+          advance = Math.floor(budget);
+          budget -= advance;
+        }
+
+        if (advance > 0) {
+          shown = Math.min(received.length, shown + advance);
+          setTyping(false); // first visible text: hand off from the dots
+          writeStreamed(received.slice(0, shown));
+        }
       }
       if (streamDone && shown >= received.length) { flushReveal(); return; }
       rafId = requestAnimationFrame(revealStep);
@@ -931,13 +980,20 @@ const handleSubmit = async () => {
     
   } catch (error) {
     console.error('Chat error:', error);
-    setMessages([...newMessages, {
-      role: 'assistant',
-      content: currentLanguage === 'es'
-        ? 'Lo siento, hubo un error al procesar tu consulta. Por favor, intenta nuevamente.'
-        : 'Sorry, there was an error processing your question. Please try again.',
-      timestamp: new Date().toISOString()
-    }]);
+    const errorText = currentLanguage === 'es'
+      ? 'Lo siento, hubo un error al procesar tu consulta. Por favor, intenta nuevamente.'
+      : 'Sorry, there was an error processing your question. Please try again.';
+    // Replace the streaming bubble in place when one exists, rather than rebuilding
+    // from `newMessages` — that discarded anything appended while the stream ran
+    // (e.g. an approval confirmation).
+    setMessages(prev => {
+      const i = streamId ? prev.findIndex(m => m.streamId === streamId) : -1;
+      const errorMessage = { role: 'assistant', content: errorText, timestamp: new Date().toISOString() };
+      if (i === -1) return [...prev, errorMessage];
+      const updated = [...prev];
+      updated[i] = { ...updated[i], ...errorMessage };
+      return updated;
+    });
   }
 
   setLoading(false);
@@ -954,20 +1010,34 @@ const handleSubmit = async () => {
         body: JSON.stringify({ approvalId, decision, sessionId: agentSessionRef.current }),
       });
       const j = await res.json().catch(() => ({}));
-      // Only drop the card once the server actually recorded the decision —
-      // otherwise a failed call hides an approval that is still pending.
-      const settled = res.ok && (j.status === 'approved' || j.status === 'rejected');
-      if (settled) setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
+      // decide() reports the row's real state, which is a wider set than
+      // approved/rejected: 'executing' means another request is mid-flight,
+      // 'error'/'unavailable' mean it will never complete. Treating any of those
+      // as a generic failure told the user to retry something already succeeding.
+      const status = res.ok ? j.status : 'http_error';
+      const es = currentLanguage === 'es';
+
+      // Drop the card for every terminal state; keep it only while still actionable.
+      const terminal = ['approved', 'rejected', 'error', 'unavailable', 'forbidden'].includes(status);
+      if (terminal) setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
 
       let text;
-      if (decision === 'reject' && res.ok && j.status === 'rejected') {
-        text = currentLanguage === 'es' ? 'Solicitud cancelada.' : 'Request cancelled.';
-      } else if (res.ok && j.status === 'approved') {
-        text = currentLanguage === 'es'
+      if (status === 'approved') {
+        text = es
           ? '✅ Solicitud confirmada. El equipo de Stem Care recibió tu información.'
           : '✅ Request confirmed. The Stem Care team has received your information.';
+      } else if (status === 'rejected') {
+        text = es ? 'Solicitud cancelada.' : 'Request cancelled.';
+      } else if (status === 'executing') {
+        text = es
+          ? 'Tu solicitud se está procesando. Un momento, por favor.'
+          : 'Your request is being processed. One moment, please.';
+      } else if (status === 'unavailable') {
+        text = es
+          ? '⚠️ No pudimos registrar tu solicitud. Por favor usa el formulario de contacto.'
+          : '⚠️ We could not register your request. Please use the contact form.';
       } else {
-        text = currentLanguage === 'es'
+        text = es
           ? '⚠️ No se pudo procesar la solicitud. Por favor intenta de nuevo.'
           : '⚠️ Could not process the request. Please try again.';
       }
@@ -1435,21 +1505,18 @@ const renderForm = () => {
 
       <Collapse in={hasConversation} timeout={300} unmountOnExit>
         <Box
-          ref={scrollRef}
-          onScroll={handleChatScroll}
           sx={{
             position:'fixed',
             left:'50%',
             transform:'translateX(-50%)',
             bottom: (footerHeight + 6) + (isMobile ? 96 : 108), // ~dock height; adjust once
             width:'100%', maxWidth: chatMaxWidth,
-            maxHeight: isMobile ? '42vh' : '55vh',
-            overflowY:'auto',
+            overflow:'hidden', // keeps the header inside the rounded corners
             backdropFilter: loading ? 'blur(2px)' : 'blur(12px)',
             backgroundColor: darkMode 
               ? (loading ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.3)')
               : (loading ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.3)'),
-            borderRadius:2, p:2,
+            borderRadius:2,
             transition: 'all 0.3s ease-in-out',
             border: darkMode
               ? (loading ? '2px solid rgba(255,255,255,0.3)' : '1px solid rgba(255,255,255,0.1)')
@@ -1459,6 +1526,42 @@ const renderForm = () => {
               : (loading ? '0 0 20px rgba(255,255,255,0.2)' : '0 0 10px rgba(255,255,255,0.1)'),
           }}
         >
+          {/* Panel controls: minimize collapses the transcript, close clears it. */}
+          <Box sx={{
+            display:'flex', alignItems:'center', justifyContent:'flex-end', gap:0.25,
+            px:1, pt:0.5, pb: chatMinimized ? 0.5 : 0,
+          }}>
+            <IconButton
+              size="small"
+              onClick={() => setChatMinimized(v => !v)}
+              aria-label={chatMinimized
+                ? (currentLanguage === 'es' ? 'Expandir conversación' : 'Expand conversation')
+                : (currentLanguage === 'es' ? 'Minimizar conversación' : 'Minimize conversation')}
+              sx={{ color: darkMode ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)' }}
+            >
+              {chatMinimized ? <ExpandLessIcon fontSize="small" /> : <RemoveIcon fontSize="small" />}
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={closeChat}
+              aria-label={currentLanguage === 'es' ? 'Cerrar conversación' : 'Close conversation'}
+              sx={{ color: darkMode ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)' }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+
+          <Box
+            ref={scrollRef}
+            onScroll={handleChatScroll}
+            sx={{
+              maxHeight: chatMinimized ? 0 : (isMobile ? '42vh' : '55vh'),
+              opacity: chatMinimized ? 0 : 1,
+              overflowY: chatMinimized ? 'hidden' : 'auto',
+              transition: 'max-height 0.3s ease-in-out, opacity 0.2s ease-in-out',
+              px:2, pb:2,
+            }}
+          >
           {messages.map((m, i) => {
   const prevRole = i > 0 ? messages[i - 1].role : null;
   // more space when role changes (user↔assistant)
@@ -1648,6 +1751,7 @@ const renderForm = () => {
       </Box>
     ))}
 
+          </Box>
         </Box>
       </Collapse>
 
